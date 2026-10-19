@@ -52,11 +52,11 @@ object MailHtmlRenderer {
 
     /**
      * Dunkle Darstellung: Mails geben ihre Farben fest vor (meist Schwarz auf Weiß), deshalb wird der ganze Inhalt
-     * invertiert und der Farbton zurückgedreht; Bilder werden ein zweites Mal invertiert und sehen wieder normal aus.
-     * Weiß wird so zu #1f1f1f, weil das iframe darunter #e0e0e0 statt Weiß bekommt.
+     * invertiert und der Farbton zurückgedreht. contrast(0.8) macht daraus Dunkelgrau (#1a1a1a) statt Schwarz und
+     * Hellgrau statt Weiß. Bilder werden vorab gegenläufig behandelt und sehen danach wieder normal aus.
      */
-    private const val DARK_FRAME = "iframe { filter: invert(1) hue-rotate(180deg); background: #e0e0e0; }"
-    private const val DARK_MEDIA = "<style>img, video, picture, svg, [background] { filter: invert(1) hue-rotate(180deg); }</style>"
+    private const val DARK_FRAME = "iframe { filter: invert(1) hue-rotate(180deg) contrast(0.8); }"
+    private const val DARK_MEDIA = "<style>img, video, picture, svg, [background] { filter: contrast(1.25) invert(1) hue-rotate(180deg); }</style>"
 
     fun hasRemoteContent(mail: ParsedMail): Boolean =
         mail.html?.let { html -> REMOTE.findAll(html).any { !it.value.startsWith("href", ignoreCase = true) } } == true

@@ -19,6 +19,15 @@ kotlin {
     jvmToolchain(25)
 }
 
+// ./gradlew runIde -Pscreenshots=<ordner> baut den Screenshot-Helfer mit ein (nie für Releases verwenden).
+val screenshotDir = providers.gradleProperty("screenshots").orNull
+
+sourceSets {
+    main {
+        if (screenshotDir != null) kotlin.srcDir("src/screenshot/kotlin")
+    }
+}
+
 repositories {
     mavenCentral()
     intellijPlatform {
@@ -50,6 +59,10 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.1.1</h3>
+            <ul>
+              <li>No deprecated API anymore; softer dark display of mails.</li>
+            </ul>
             <h3>0.1.0</h3>
             <ul>
               <li>First release: .eml files open in a rendered mail view (subject, sender, recipients, CC, BCC,
@@ -93,7 +106,27 @@ tasks.test {
     testLogging { showStandardStreams = true }
 }
 
+// Für Screenshots wird das Demo-Projekt an einen neutralen Ort kopiert, damit kein lokaler
+// Benutzerpfad im Bild erscheint.
+val screenshotProjectDir = "/Users/Shared/mail-demo"
+
+val prepareScreenshotProject = tasks.register<Sync>("prepareScreenshotProject") {
+    from("marketplace/demo-project")
+    into(screenshotProjectDir)
+}
+
 tasks.runIde {
-    // ./gradlew runIde -PopenProject=/pfad/zum/projekt öffnet direkt ein Projekt in der Sandbox.
-    providers.gradleProperty("openProject").orNull?.let { args(it) }
+    if (screenshotDir != null) {
+        dependsOn(prepareScreenshotProject)
+        args(screenshotProjectDir)
+        jvmArgs("-Dmailview.screenshots=${file(screenshotDir).absolutePath}")
+    } else {
+        // ./gradlew runIde -PopenProject=/pfad/zum/projekt öffnet direkt ein Projekt in der Sandbox.
+        providers.gradleProperty("openProject").orNull?.let { args(it) }
+    }
+}
+
+// Ohne -Pscreenshots bleibt aus dem Build-Cache sonst ein leeres screenshot/-Verzeichnis in den Jars.
+tasks.withType<Zip>().configureEach {
+    includeEmptyDirs = false
 }
