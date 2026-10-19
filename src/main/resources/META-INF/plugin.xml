@@ -1,0 +1,42 @@
+<idea-plugin>
+    <id>app.heckit.ide.mailview</id>
+    <name>Mail View</name>
+    <vendor url="https://heckit.app">heck\it</vendor>
+
+    <description><![CDATA[
+<p>
+  Read <b>.eml</b> files right in your IDE.
+  <b>Mail View</b> shows a saved e-mail the way a mail client does: subject, sender, recipients and the message itself,
+  instead of encoded MIME text.
+</p>
+
+<h3>Three views, switchable at the bottom of the editor</h3>
+<ul>
+  <li><b>Mail</b> (default): subject, from, to, CC, BCC, reply-to and date, followed by the rendered message.
+      Embedded images are shown, remote content is blocked until you allow it. Attachments can be opened or saved.</li>
+  <li><b>Content</b>: the decoded HTML or plain text part, with syntax highlighting.</li>
+  <li><b>Text</b>: the raw file, read-only by default so a mail can't be changed by accident. <i>Edit</i> in the bar above unlocks it; changes show up in the other views right away.</li>
+</ul>
+
+<p>Links in a message open in your system browser. Scripts never run.</p>
+
+<p>Works in all JetBrains IDEs based on the IntelliJ Platform (PhpStorm, IntelliJ IDEA, WebStorm, PyCharm, GoLand, ...). UI available in English and German.</p>
+
+<p>Like Mail View? You can <a href="https://ko-fi.com/phse_de">buy me a coffee on Ko-fi</a>. More tools at <a href="https://heckit.app">heckit.app</a>.</p>
+]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.jcef</depends>
+
+    <resource-bundle>messages.MailViewBundle</resource-bundle>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <fileType name="EML" implementationClass="app.heckit.ide.mailview.EmlFileType" fieldName="INSTANCE"
+                  extensions="eml"/>
+        <fileEditorProvider id="mail-view-preview" order="first"
+                            implementation="app.heckit.ide.mailview.MailPreviewEditorProvider"/>
+        <fileEditorProvider id="mail-view-content" order="after mail-view-preview"
+                            implementation="app.heckit.ide.mailview.MailContentEditorProvider"/>
+        <editorNotificationProvider implementation="app.heckit.ide.mailview.MailEditModeNotificationProvider"/>
+    </extensions>
+</idea-plugin>
