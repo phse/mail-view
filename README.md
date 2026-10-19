@@ -2,7 +2,7 @@
 
 <img src="marketplace/plugin-icon.png" width="360" alt="Mail View icon for light and dark themes">
 
-Plugin ID `app.heckit.ide.mailview` · Vendor heck\it ([heckit.app](https://heckit.app)) · Source: https://github.com/phse/mail-view
+Plugin ID `app.heckit.ide.mailview` · Vendor heck\it ([heckit.app](https://heckit.app)) · [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35284-mail-view) · Source: https://github.com/phse/mail-view
 
 ![Mail View](marketplace/screenshots/01-mail.png)
 
@@ -28,8 +28,9 @@ The UI is available in English and German.
 
 ## Installation
 
-In the IDE, go to *Settings | Plugins | Marketplace* and search for **Mail View**. Bugs and ideas
-are welcome as [GitHub issues](https://github.com/phse/mail-view/issues).
+In the IDE, go to *Settings | Plugins | Marketplace* and search for **Mail View**, or use the
+[Marketplace page](https://plugins.jetbrains.com/plugin/35284-mail-view). Bugs and ideas are
+welcome as [GitHub issues](https://github.com/phse/mail-view/issues).
 
 ## Build and run
 
@@ -71,10 +72,11 @@ uploaded separately. `marketplace/plugin-icon.png` at the top of this README is 
 
 1. Bump the version in `gradle.properties`, add change notes.
 2. `./gradlew clean buildPlugin verifyPlugin` (fix any deprecated API it reports before releasing)
-3. Upload the ZIP from `build/distributions/` by hand on the Marketplace (the first version has to
-   be uploaded this way), later `./gradlew publishPlugin` with a token from
-   https://plugins.jetbrains.com/author/me/tokens (`PUBLISH_TOKEN=…`). JetBrains reviews every
-   version before it is released.
+3. `PUBLISH_TOKEN=… ./gradlew publishPlugin` with a token from
+   https://plugins.jetbrains.com/author/me/tokens (or `jetbrainsMarketplaceToken=…` in
+   `~/.gradle/gradle.properties`), or upload the ZIP from `build/distributions/` by hand on the
+   [Marketplace page](https://plugins.jetbrains.com/plugin/35284-mail-view). JetBrains reviews
+   every version before it is released.
 4. Tag the commit (`git tag v<version>`) and push.
 
 Signing is optional (variables `CERTIFICATE_CHAIN`, `PRIVATE_KEY`, `PRIVATE_KEY_PASSWORD`,
