@@ -1,0 +1,129 @@
+Content-Type: multipart/mixed; boundary="===============5897603572229684954=="
+MIME-Version: 1.0
+Subject: Summer Meetup: program and venue
+From: Sam Taylor <sam@riverside-makers.example>
+To: Alex Morgan <alex@example.com>
+Cc: Jordan Lee <jordan@example.com>
+Reply-To: meetup@riverside-makers.example
+Date: Mon, 06 Jul 2026 09:14:00 +0200
+
+--===============5897603572229684954==
+Content-Type: multipart/alternative; boundary="===============5681495128573043407=="
+MIME-Version: 1.0
+
+--===============5681495128573043407==
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+SGkgQWxleCwKCnRoYW5rcyBmb3Igc2lnbmluZyB1cCEgSGVyZSBpcyBldmVyeXRoaW5nIHlvdSBu
+ZWVkIGZvciBTYXR1cmRheSwgSnVseSAxOCBhdCB0aGUgT2xkIE1pbGwgd29ya3Nob3A6CgoxMDow
+MCAgV2VsY29tZSAmIGNvZmZlZQoxMDozMCAgTGlnaHRuaW5nIHRhbGtzOiBob21lIGF1dG9tYXRp
+b24gb24gYSBidWRnZXQKMTI6MzAgIEx1bmNoIGluIHRoZSBjb3VydHlhcmQKMTQ6MDAgIEhhbmRz
+LW9uOiBlLWluayBwaG90byBmcmFtZXMKMTY6MzAgIFNob3cgJiB0ZWxsCgpUaGUgZnVsbCBwcm9n
+cmFtIGFuZCBhIG1hcCBhcmUgYXR0YWNoZWQuIEJyaW5nIHlvdXIgcHJvamVjdHMhCgpTZWUgeW91
+IHRoZXJlLApTYW0K
+
+--===============5681495128573043407==
+Content-Type: multipart/related; boundary="===============7542390823297767589=="
+MIME-Version: 1.0
+
+--===============7542390823297767589==
+Content-Type: text/html; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+
+PGh0bWw+PGJvZHkgc3R5bGU9Im1hcmdpbjowO2JhY2tncm91bmQ6I2VlZjFmNSI+Cjx0YWJsZSB3
+aWR0aD0iMTAwJSIgY2VsbHBhZGRpbmc9IjAiIGNlbGxzcGFjaW5nPSIwIiBzdHlsZT0iYmFja2dy
+b3VuZDojZWVmMWY1O3BhZGRpbmc6MjhweCAxMnB4Ij48dHI+PHRkIGFsaWduPSJjZW50ZXIiPgo8
+dGFibGUgd2lkdGg9IjU4MCIgY2VsbHBhZGRpbmc9IjAiIGNlbGxzcGFjaW5nPSIwIiBzdHlsZT0i
+bWF4LXdpZHRoOjU4MHB4O2JhY2tncm91bmQ6I2ZmZmZmZjtib3JkZXItcmFkaXVzOjE0cHg7b3Zl
+cmZsb3c6aGlkZGVuO2ZvbnQtZmFtaWx5OkNhbGlicmksQXJpYWwsc2Fucy1zZXJpZjtjb2xvcjoj
+MmIyZjM2O2ZvbnQtc2l6ZToxNXB4O2xpbmUtaGVpZ2h0OjEuNTUiPgo8dHI+PHRkIHN0eWxlPSJi
+YWNrZ3JvdW5kOiMyQTdBQTA7YmFja2dyb3VuZC1pbWFnZTpsaW5lYXItZ3JhZGllbnQoMTM1ZGVn
+LCNCMDQwNzksIzVBNUE4QyA1NSUsIzJBN0FBMCk7cGFkZGluZzoyMnB4IDMycHgiPgo8dGFibGUg
+Y2VsbHBhZGRpbmc9IjAiIGNlbGxzcGFjaW5nPSIwIj48dHI+Cjx0ZD48aW1nIHNyYz0iY2lkOmxv
+Z28iIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCIgYWx0PSIiIHN0eWxlPSJkaXNwbGF5OmJsb2NrO2Jv
+cmRlci1yYWRpdXM6MTFweCI+PC90ZD4KPHRkIHN0eWxlPSJwYWRkaW5nLWxlZnQ6MTRweDtjb2xv
+cjojZmZmZmZmO2ZvbnQtc2l6ZToxOXB4O2ZvbnQtd2VpZ2h0OmJvbGQ7bGV0dGVyLXNwYWNpbmc6
+LjNweCI+Uml2ZXJzaWRlIE1ha2VyczxkaXYgc3R5bGU9ImZvbnQtc2l6ZToxM3B4O2ZvbnQtd2Vp
+Z2h0Om5vcm1hbDtvcGFjaXR5Oi44NSI+U3VtbWVyIE1lZXR1cCAyMDI2PC9kaXY+PC90ZD4KPC90
+cj48L3RhYmxlPjwvdGQ+PC90cj4KPHRyPjx0ZCBzdHlsZT0icGFkZGluZzoyOHB4IDMycHggOHB4
+Ij4KPGgyIHN0eWxlPSJtYXJnaW46MCAwIDE0cHg7Zm9udC1zaXplOjIycHg7Y29sb3I6IzJiMmYz
+NiI+UHJvZ3JhbSBhbmQgdmVudWU8L2gyPgo8cCBzdHlsZT0ibWFyZ2luOjAgMCAxMnB4Ij5IaSBB
+bGV4LDwvcD4KPHAgc3R5bGU9Im1hcmdpbjowIDAgMThweCI+dGhhbmtzIGZvciBzaWduaW5nIHVw
+ISBIZXJlIGlzIGV2ZXJ5dGhpbmcgeW91IG5lZWQgZm9yIDxiPlNhdHVyZGF5LCBKdWx5IDE4PC9i
+PiBhdCB0aGUgT2xkIE1pbGwgd29ya3Nob3A6PC9wPgo8dGFibGUgY2VsbHBhZGRpbmc9IjAiIGNl
+bGxzcGFjaW5nPSIwIiBzdHlsZT0iYm9yZGVyLWNvbGxhcHNlOmNvbGxhcHNlO3dpZHRoOjEwMCU7
+Zm9udC1zaXplOjE0cHg7Ym9yZGVyLXJhZGl1czo4cHg7b3ZlcmZsb3c6aGlkZGVuIj48dHI+PHRk
+IHN0eWxlPSJwYWRkaW5nOjEwcHggMTRweDtiYWNrZ3JvdW5kOiNmM2Y1Zjk7Y29sb3I6IzJBN0FB
+MDtmb250LXdlaWdodDpib2xkO3dpZHRoOjY0cHgiPjEwOjAwPC90ZD48dGQgc3R5bGU9InBhZGRp
+bmc6MTBweCAxNHB4O2JhY2tncm91bmQ6I2YzZjVmOTsiPldlbGNvbWUgJmFtcDsgY29mZmVlPC90
+ZD48L3RyPjx0cj48dGQgc3R5bGU9InBhZGRpbmc6MTBweCAxNHB4O2NvbG9yOiMyQTdBQTA7Zm9u
+dC13ZWlnaHQ6Ym9sZDt3aWR0aDo2NHB4Ij4xMDozMDwvdGQ+PHRkIHN0eWxlPSJwYWRkaW5nOjEw
+cHggMTRweDsiPkxpZ2h0bmluZyB0YWxrczogaG9tZSBhdXRvbWF0aW9uIG9uIGEgYnVkZ2V0PC90
+ZD48L3RyPjx0cj48dGQgc3R5bGU9InBhZGRpbmc6MTBweCAxNHB4O2JhY2tncm91bmQ6I2YzZjVm
+OTtjb2xvcjojMkE3QUEwO2ZvbnQtd2VpZ2h0OmJvbGQ7d2lkdGg6NjRweCI+MTI6MzA8L3RkPjx0
+ZCBzdHlsZT0icGFkZGluZzoxMHB4IDE0cHg7YmFja2dyb3VuZDojZjNmNWY5OyI+THVuY2ggaW4g
+dGhlIGNvdXJ0eWFyZDwvdGQ+PC90cj48dHI+PHRkIHN0eWxlPSJwYWRkaW5nOjEwcHggMTRweDtj
+b2xvcjojMkE3QUEwO2ZvbnQtd2VpZ2h0OmJvbGQ7d2lkdGg6NjRweCI+MTQ6MDA8L3RkPjx0ZCBz
+dHlsZT0icGFkZGluZzoxMHB4IDE0cHg7Ij5IYW5kcy1vbjogZS1pbmsgcGhvdG8gZnJhbWVzPC90
+ZD48L3RyPjx0cj48dGQgc3R5bGU9InBhZGRpbmc6MTBweCAxNHB4O2JhY2tncm91bmQ6I2YzZjVm
+OTtjb2xvcjojMkE3QUEwO2ZvbnQtd2VpZ2h0OmJvbGQ7d2lkdGg6NjRweCI+MTY6MzA8L3RkPjx0
+ZCBzdHlsZT0icGFkZGluZzoxMHB4IDE0cHg7YmFja2dyb3VuZDojZjNmNWY5OyI+U2hvdyAmYW1w
+OyB0ZWxsPC90ZD48L3RyPjwvdGFibGU+CjxwIHN0eWxlPSJtYXJnaW46MThweCAwIDAiPlRoZSBm
+dWxsIHByb2dyYW0gYW5kIGEgbWFwIGFyZSBhdHRhY2hlZC4gQnJpbmcgeW91ciBwcm9qZWN0cyE8
+L3A+CjxwIHN0eWxlPSJtYXJnaW46MjZweCAwIj48YSBocmVmPSJodHRwczovL2V4YW1wbGUub3Jn
+L21lZXR1cCIgc3R5bGU9ImJhY2tncm91bmQ6IzVBNUE4Qztjb2xvcjojZmZmZmZmO3BhZGRpbmc6
+MTFweCAyMnB4O2JvcmRlci1yYWRpdXM6OHB4O3RleHQtZGVjb3JhdGlvbjpub25lO2ZvbnQtd2Vp
+Z2h0OmJvbGQiPkFkZCB0byBjYWxlbmRhcjwvYT48L3A+CjxwIHN0eWxlPSJtYXJnaW46MCAwIDI0
+cHgiPlNlZSB5b3UgdGhlcmUsPGJyPlNhbTwvcD48L3RkPjwvdHI+Cjx0cj48dGQgc3R5bGU9InBh
+ZGRpbmc6MTZweCAzMnB4IDI0cHg7Zm9udC1zaXplOjEycHg7Y29sb3I6IzhhOTA5YTtib3JkZXIt
+dG9wOjFweCBzb2xpZCAjZTZlOWVmIj5SaXZlcnNpZGUgTWFrZXJzICZtaWRkb3Q7IE9sZCBNaWxs
+LCAxMiBNaWxsIFN0cmVldDxicj5Zb3UgZ2V0IHRoaXMgbWFpbCBiZWNhdXNlIHlvdSBzaWduZWQg
+dXAgZm9yIHRoZSBtZWV0dXAuPC90ZD48L3RyPgo8L3RhYmxlPjwvdGQ+PC90cj48L3RhYmxlPjwv
+Ym9keT48L2h0bWw+
+
+--===============7542390823297767589==
+Content-Type: image/svg+xml
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+Content-ID: <logo>
+Content-Disposition: inline; filename="logo.svg"
+
+PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NiIgaGVpZ2h0
+PSI5NiIgdmlld0JveD0iMCAwIDk2IDk2Ij4KPHJlY3Qgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiBy
+eD0iMjIiIGZpbGw9IiNmZmZmZmYiLz4KPHBhdGggZD0iTTE4IDYyIEMzMCA1MCA0MCA3NCA1MiA2
+MiBTNzAgNTAgNzggNTgiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJBN0FBMCIgc3Ryb2tlLXdpZHRo
+PSI3IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPHBhdGggZD0iTTMwIDQ0IEwzMCAyNiBMNDgg
+MzYgTDY2IDI2IEw2NiA0NCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjQjA0MDc5IiBzdHJva2Utd2lk
+dGg9IjciIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8
+L3N2Zz4=
+
+--===============7542390823297767589==--
+
+--===============5681495128573043407==--
+
+--===============5897603572229684954==
+Content-Type: application/pdf
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="program.pdf"
+
+JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqIDIgMCBv
+Ymo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iaiAzIDAgb2JqPDwvVHlw
+ZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgNTk1IDg0Ml0+PmVuZG9iagp0cmFpbGVy
+PDwvUm9vdCAxIDAgUj4+CiUlRU9GCg==
+
+--===============5897603572229684954==
+Content-Type: application/pdf
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="venue-map.pdf"
+
+JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZy9QYWdlcyAyIDAgUj4+ZW5kb2JqIDIgMCBv
+Ymo8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PmVuZG9iaiAzIDAgb2JqPDwvVHlw
+ZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgNTk1IDg0Ml0+PmVuZG9iagp0cmFpbGVy
+PDwvUm9vdCAxIDAgUj4+CiUlRU9GCg==
+
+--===============5897603572229684954==--

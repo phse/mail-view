@@ -13,7 +13,6 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ide.actions.RevealFileAction
-import com.intellij.ide.IdeEventQueue
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -45,7 +44,6 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.FlowLayout
 import java.awt.Rectangle
-import java.awt.event.MouseWheelEvent
 import java.beans.PropertyChangeListener
 import java.io.File
 import javax.swing.JComponent
@@ -65,7 +63,11 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
     // Browser die volle Seitenhöhe und Swing scrollt (wie in den anderen Reitern), nur sehr lange Mails nicht.
     private val browser: JBCefBrowser? = if (JBCefApp.isSupported()) JBCefBrowser.createBuilder().build() else null
     private var pageHeight = 0
-    private val browserHost = object : BorderLayoutPanel() {
+    private val browserHost = object : JPanel(null) {
+        // Browser und Mausrad-Fläche liegen übereinander und füllen beide die ganze Fläche.
+        override fun doLayout() = components.forEach { it.setBounds(0, 0, width, height) }
+        override fun isOptimizedDrawingEnabled() = false
+
         override fun getPreferredSize(): Dimension {
             val extent = (parent?.parent as? JViewport)?.extentSize?.height ?: 0
             val viewport = maxOf(0, extent - (parent?.height ?: 0) + height)
@@ -105,7 +107,8 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
             Disposer.register(this, browser)
             installLinkHandling(browser)
             installHeightTracking(browser)
-            browserHost.addToCenter(browser.component)
+            browserHost.add(wheelCatcher(browser))
+            browserHost.add(browser.component)
             root.addToCenter(scrollPane)
             val toolbar = ActionManager.getInstance().createActionToolbar("MailView.Mail", DefaultActionGroup(DarkAction()), true)
             toolbar.targetComponent = scrollPane
@@ -192,6 +195,12 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
         attachmentsPanel.repaint()
     }
 
+    /** Für die Marketplace-Screenshots. */
+    internal fun expandAttachments() {
+        attachmentsExpanded = true
+        mail?.let { updateAttachments(it) }
+    }
+
     private fun open(attachment: MailAttachment) {
         val dir = FileUtil.createTempDirectory("mail-view", null, true)
         val target = File(dir, FileUtil.sanitizeFileName(attachment.name, false))
@@ -219,18 +228,24 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
                 return true
             }
         }, browser.cefBrowser)
-        // Das Offscreen-Bauteil schluckt Mausrad-Ereignisse; solange Swing scrollt, gehen sie an die Scrollpane.
-        IdeEventQueue.getInstance().addDispatcher({ e ->
-            if (e !is MouseWheelEvent || pageHeight !in 1..MAX_SWING_HEIGHT || e.isControlDown || e.isMetaDown) return@addDispatcher false
-            val target = browser.component
-            // Das Ereignis kommt am Fenster an; welches Bauteil darunter liegt, muss man selbst nachsehen.
-            val source = e.component ?: return@addDispatcher false
-            if (!target.isShowing) return@addDispatcher false
-            val hit = SwingUtilities.getDeepestComponentAt(source, e.x, e.y) ?: return@addDispatcher false
-            if (!SwingUtilities.isDescendingFrom(hit, target)) return@addDispatcher false
-            scrollPane.dispatchEvent(SwingUtilities.convertMouseEvent(source, e, scrollPane))
-            true
-        }, this)
+    }
+
+    /**
+     * Unsichtbare Fläche über dem Browser, die nur Mausrad-Ereignisse annimmt (Klicks gehen weiter an den Browser):
+     * Das Offscreen-Bauteil würde das Mausrad sonst selbst verarbeiten. Solange Swing scrollt, geht es an die
+     * Scrollpane, sonst (lange Mails, Zoomen mit Cmd/Ctrl) an den Browser.
+     */
+    private fun wheelCatcher(browser: JBCefBrowser) = object : JComponent() {
+        init {
+            addMouseWheelListener { e ->
+                val swing = pageHeight in 1..MAX_SWING_HEIGHT && !e.isControlDown && !e.isMetaDown
+                val target = if (swing) scrollPane else browser.component
+                target.dispatchEvent(SwingUtilities.convertMouseEvent(this, e, target))
+            }
+        }
+
+        // Mauszeiger des Browsers zeigen (Text, Link), nicht den eigenen.
+        override fun getCursor(): Cursor = browser.component.cursor
     }
 
     private fun updatePageHeight(height: Int) {
@@ -295,7 +310,7 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
     private companion object {
         /** Höher wird der Offscreen-Puffer zu groß (Retina: Breite × Höhe × 16 Byte). */
         const val MAX_SWING_HEIGHT = 8000
-        val DARK_BACKGROUND = Color(0x1f1f1f)
+        val DARK_BACKGROUND = Color(0x1a1a1a)
         const val HEIGHT_PREFIX = "mail-view:height="
     }
 }

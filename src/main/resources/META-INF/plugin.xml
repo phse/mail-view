@@ -37,6 +37,7 @@
                             implementation="app.heckit.ide.mailview.MailPreviewEditorProvider"/>
         <fileEditorProvider id="mail-view-content" order="after mail-view-preview"
                             implementation="app.heckit.ide.mailview.MailContentEditorProvider"/>
+        <postStartupActivity implementation="app.heckit.ide.mailview.ScreenshotStarter"/>
         <editorNotificationProvider implementation="app.heckit.ide.mailview.MailEditModeNotificationProvider"/>
     </extensions>
 </idea-plugin>
