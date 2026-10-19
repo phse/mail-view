@@ -54,6 +54,8 @@ intellijPlatform {
             <ul>
               <li>First release: .eml files open in a rendered mail view (subject, sender, recipients, CC, BCC,
                   date, body, attachments), a content view (HTML or plain text part) and the raw text.</li>
+              <li>Read-only by default; remote content is blocked until you load it.</li>
+              <li>Optional dark display of the mail (follows the IDE theme by default).</li>
             </ul>
         """.trimIndent()
     }
