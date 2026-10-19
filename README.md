@@ -1,6 +1,10 @@
 # Mail View
 
-Plugin ID `app.heckit.ide.mailview` · Vendor heck\it ([heckit.app](https://heckit.app))
+<img src="marketplace/plugin-icon.png" width="360" alt="Mail View icon for light and dark themes">
+
+Plugin ID `app.heckit.ide.mailview` · Vendor heck\it ([heckit.app](https://heckit.app)) · Source: https://github.com/phse/mail-view
+
+![Mail View](marketplace/screenshots/01-mail.png)
 
 A plugin for JetBrains IDEs (PhpStorm, IntelliJ IDEA, … 2026.1 and later) that opens `.eml`
 files the way a mail client shows them. Three tabs at the bottom of the editor, like *Text | Data*
@@ -9,30 +13,86 @@ for CSV files:
 - **Mail** (default): subject, from, to, CC, BCC, reply-to and date, then the rendered message
   (HTML in an embedded browser, plain text otherwise). `cid:` images are embedded, remote content
   is blocked until *Load remote content* is clicked. Scripts never run. Links open in the system
-  browser. Attachments: click to open with the system application, *Save…* to store a copy.
+  browser.
+- **Attachments** are listed above the message (collapsed, click to expand): click one to open it
+  with the system application, *Save…* to store a copy.
+- **Dark** in the bar above the message shows the mail in dark colors. The default follows the IDE
+  theme; once switched, the choice applies to all mails.
 - **Content**: the decoded HTML or plain text part (switch at the top), read-only, highlighted.
 - **Text**: the raw file in the regular editor, **read-only by default** (view and select only).
   *Edit* in the bar above unlocks it for this file until the IDE restarts; edits show up in the
   other tabs after a moment.
 
 The plugin never writes to the `.eml` file itself; only the unlocked *Text* tab can change it.
-UI in English and German.
+The UI is available in English and German.
+
+## Installation
+
+In the IDE, go to *Settings | Plugins | Marketplace* and search for **Mail View**. Bugs and ideas
+are welcome as [GitHub issues](https://github.com/phse/mail-view/issues).
 
 ## Build and run
 
-Gradle needs a JDK 17+ ;
-the toolchain (JDK 25) is downloaded via foojay if needed.
+Gradle needs JDK 17 or later. The toolchain (JDK 25) is downloaded by Gradle via foojay if needed.
 
 ```
-./gradlew runIde        # sandbox IDE with the plugin
+./gradlew runIde        # start a sandbox IDE with the plugin
 ./gradlew buildPlugin   # build/distributions/mail-view-<version>.zip
-./gradlew verifyPlugin  # against the local IDE and verifyOldestVersion
-./gradlew test -Psamples=<folder with .eml>   # parses real mails and prints their parts
+./gradlew test          # unit tests
 ```
+
+Verify against the local IDE and the oldest supported version (`verifyOldestVersion`):
+
+```
+./gradlew verifyPlugin
+```
+
+Options (`-P…`):
+
+- `openProject=/path/to/project` opens a project in the sandbox right away
+- `samples=<folder with .eml>` (with `test`) parses real mails and prints their parts
 
 Install a self-built ZIP: *Settings | Plugins | ⚙ | Install Plugin from Disk…*
 
-`local.properties` (not checked in) can point to an installed IDE: `platformLocalPath=/Applications/PhpStorm.app`.
+By default Gradle downloads PhpStorm `platformVersion` (from `gradle.properties`) as the target
+platform. With an installed IDE it's faster: create `local.properties` (not checked in) containing
+e.g.
+
+```
+platformLocalPath=/Applications/PhpStorm.app
+```
+
+## Publishing (JetBrains Marketplace)
+
+The Marketplace description lives in `src/main/resources/META-INF/plugin.xml`, the change notes in
+`build.gradle.kts`, the icon in `META-INF/pluginIcon.svg` (light theme) and `pluginIcon_dark.svg`
+(dark theme). The IDE and the Marketplace read the icon straight from the ZIP, it doesn't have to be
+uploaded separately. `marketplace/plugin-icon.png` at the top of this README is a preview of both.
+
+1. Bump the version in `gradle.properties`, add change notes.
+2. `./gradlew clean buildPlugin verifyPlugin` (fix any deprecated API it reports before releasing)
+3. Upload the ZIP from `build/distributions/` by hand on the Marketplace (the first version has to
+   be uploaded this way), later `./gradlew publishPlugin` with a token from
+   https://plugins.jetbrains.com/author/me/tokens (`PUBLISH_TOKEN=…`). JetBrains reviews every
+   version before it is released.
+4. Tag the commit (`git tag v<version>`) and push.
+
+Signing is optional (variables `CERTIFICATE_CHAIN`, `PRIVATE_KEY`, `PRIVATE_KEY_PASSWORD`,
+see https://plugins.jetbrains.com/docs/intellij/plugin-signing.html).
+
+## Regenerating the screenshots
+
+```
+./gradlew runIde -Pscreenshots=marketplace/screenshots
+```
+
+Copies `marketplace/demo-project` to `/Users/Shared/mail-demo` (so no user path shows up in the
+images), opens it in the sandbox and writes four PNGs to `marketplace/screenshots/` (mail, attachments,
+content tab, dark theme). The IDE paints its own window for this, no screen recording permission is
+needed. The helper lives in `src/screenshot/` and is only compiled with `-Pscreenshots`, never into a
+release. Close any running sandbox first, and close the sandbox afterwards.
+
+If the sandbox asks on the first run, confirm "Trust Project" once and run the command again.
 
 ## How it works
 
@@ -41,11 +101,18 @@ Install a self-built ZIP: *Settings | Plugins | ⚙ | Install Plugin from Disk�
 | `EmlFileType.kt` | File type `.eml` (text, so the regular editor shows the raw data), icon |
 | `MailParser.kt` | MIME parsing with Jakarta/Angus Mail (headers, HTML/text part, inline images, attachments) |
 | `MailSource.kt` | Parses in the background and again after edits (unsaved document or file bytes) |
-| `MailHtmlRenderer.kt` | HTML page of the *Mail* tab: header, message in a sandboxed iframe, CSP |
-| `MailPreviewEditor.kt` | *Mail* tab (JCEF), remote content banner, attachments |
+| `MailHtmlRenderer.kt` | HTML page of the *Mail* tab: header, message in a sandboxed iframe, CSP, dark display |
+| `MailPreviewEditor.kt` | *Mail* tab (JCEF), scrolling, remote content banner, attachments, *Dark* switch |
+| `MailViewSettings.kt` | Settings shared by all projects (dark display) |
 | `MailContentEditor.kt` | *Content* tab (read-only editor, HTML/Text switch) |
 | `MailEditMode.kt` | Read-only by default, edit mode per file, bar above the *Text* tab |
 | `MailEditorProviders.kt` | Registers both tabs before the regular editor |
+| `MailViewBundle.kt` | UI texts (English, German) in `resources/messages/` |
+
+Since 2026.x JCEF always renders off-screen, and scrolling inside Chromium stutters then. The page
+therefore reports its height, the browser gets the full height and a regular Swing scroll pane
+scrolls, like in the other tabs. Very long mails (over 8000 px) scroll inside Chromium to keep the
+off-screen buffer small.
 
 `getContent()` of Jakarta Mail is avoided on purpose: it needs Jakarta Activation's mailcap
 registry, which doesn't work reliably in a plugin class loader. Multiparts are read via
