@@ -7,8 +7,8 @@ Plugin ID `app.heckit.ide.mailview` · Vendor heck\it ([heckit.app](https://heck
 ![Mail View](marketplace/screenshots/01-mail.png)
 
 A plugin for JetBrains IDEs (PhpStorm, IntelliJ IDEA, … 2026.1 and later) that opens `.eml`
-files the way a mail client shows them. Three tabs at the bottom of the editor, like *Text | Data*
-for CSV files:
+and Outlook `.msg` files the way a mail client shows them. Tabs at the bottom of the editor, like
+*Text | Data* for CSV files:
 
 - **Mail** (default): subject, from, to, CC, BCC, reply-to and date, then the rendered message
   (HTML in an embedded browser, plain text otherwise). `cid:` images are embedded, remote content
@@ -19,11 +19,14 @@ for CSV files:
 - **Dark** in the bar above the message shows the mail in dark colors. The default follows the IDE
   theme; once switched, the choice applies to all mails.
 - **Content**: the decoded HTML or plain text part (switch at the top), read-only, highlighted.
+- **Headers**: all header lines of the mail (Received chain, authentication results, …), read-only.
+  For `.msg` these are the transport headers Outlook stores for received mails; drafts and sent
+  mails have none.
 - **Text**: the raw file in the regular editor, **read-only by default** (view and select only).
   *Edit* in the bar above unlocks it for this file until the IDE restarts; edits show up in the
-  other tabs after a moment.
+  other tabs after a moment. `.eml` only: `.msg` is a binary format and has no *Text* tab.
 
-The plugin never writes to the `.eml` file itself; only the unlocked *Text* tab can change it.
+The plugin never writes to the mail file itself; only the unlocked *Text* tab can change an `.eml`.
 The UI is available in English and German.
 
 ## Installation
@@ -51,7 +54,8 @@ Verify against the local IDE and the oldest supported version (`verifyOldestVers
 Options (`-P…`):
 
 - `openProject=/path/to/project` opens a project in the sandbox right away
-- `samples=<folder with .eml>` (with `test`) parses real mails and prints their parts
+- `samples=<folder with .eml/.msg>` (with `test`) parses real mails and prints their parts or the error.
+  Good `.msg` test files: `test-data/hsmf` in the [Apache POI](https://github.com/apache/poi) repository.
 
 Install a self-built ZIP: *Settings | Plugins | ⚙ | Install Plugin from Disk…*
 
@@ -89,8 +93,8 @@ see https://plugins.jetbrains.com/docs/intellij/plugin-signing.html).
 ```
 
 Copies `marketplace/demo-project` to `/Users/Shared/mail-demo` (so no user path shows up in the
-images), opens it in the sandbox and writes four PNGs to `marketplace/screenshots/` (mail, attachments,
-content tab, dark theme). The IDE paints its own window for this, no screen recording permission is
+images), opens it in the sandbox and writes five PNGs to `marketplace/screenshots/` (mail, attachments,
+content tab, dark theme, headers tab). The IDE paints its own window for this, no screen recording permission is
 needed. The helper lives in `src/screenshot/` and is only compiled with `-Pscreenshots`, never into a
 release. Close any running sandbox first, and close the sandbox afterwards.
 
@@ -100,15 +104,19 @@ If the sandbox asks on the first run, confirm "Trust Project" once and run the c
 
 | File | Contents |
 | --- | --- |
-| `EmlFileType.kt` | File type `.eml` (text, so the regular editor shows the raw data), icon |
-| `MailParser.kt` | MIME parsing with Jakarta/Angus Mail (headers, HTML/text part, inline images, attachments) |
+| `EmlFileType.kt` | File types `.eml` (text, so the regular editor shows the raw data) and `.msg` (binary), icon |
+| `MailParser.kt` | MIME parsing with Jakarta/Angus Mail (headers, HTML/text part, inline images, attachments); hands `.msg` to `MsgParser` |
+| `MsgParser.kt` | Outlook `.msg` (MS-OXMSG): properties, recipients, attachments, codepages, RTF-only bodies via `rtf-to-html` |
+| `CfbReader.kt` | Read-only reader for the OLE2 container of `.msg` (MS-CFB: FAT, DIFAT, mini stream, directory) |
+| `CompressedRtf.kt` | Decompresses the RTF body of `.msg` (MS-OXRTFCP, LZFu) |
 | `MailSource.kt` | Parses in the background and again after edits (unsaved document or file bytes) |
 | `MailHtmlRenderer.kt` | HTML page of the *Mail* tab: header, message in a sandboxed iframe, CSP, dark display |
 | `MailPreviewEditor.kt` | *Mail* tab (JCEF), scrolling, remote content banner, attachments, *Dark* switch |
 | `MailViewSettings.kt` | Settings shared by all projects (dark display) |
 | `MailContentEditor.kt` | *Content* tab (read-only editor, HTML/Text switch) |
+| `MailHeaderEditor.kt` | *Headers* tab (read-only editor) |
 | `MailEditMode.kt` | Read-only by default, edit mode per file, bar above the *Text* tab |
-| `MailEditorProviders.kt` | Registers both tabs before the regular editor |
+| `MailEditorProviders.kt` | Registers the tabs before the regular editor |
 | `MailViewBundle.kt` | UI texts (English, German) in `resources/messages/` |
 
 Since 2026.x JCEF always renders off-screen, and scrolling inside Chromium stutters then. The page
@@ -119,6 +127,9 @@ off-screen buffer small.
 `getContent()` of Jakarta Mail is avoided on purpose: it needs Jakarta Activation's mailcap
 registry, which doesn't work reliably in a plugin class loader. Multiparts are read via
 `MimePartDataSource`, text parts as decoded bytes with their charset.
+
+`.msg` is read without Apache POI: the plugin only needs the OLE2 container and the RTF
+decompression, both openly documented by Microsoft. POI would add about 7 MB for that.
 
 ## License
 

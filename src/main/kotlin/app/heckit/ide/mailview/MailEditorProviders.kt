@@ -7,13 +7,22 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 
-// Beide stehen vor dem normalen Texteditor (Rohdaten); so ergeben sich unten die Reiter Mail | Inhalt | Text.
-private fun isMail(file: VirtualFile) = !file.isDirectory && file.extension.equals("eml", ignoreCase = true)
+// Beide stehen vor dem normalen Texteditor (Rohdaten); so ergeben sich unten die Reiter Mail | Inhalt | Header | Text.
+// Bei .msg (binär) gibt es keinen Texteditor, dort bleiben Mail | Inhalt | Header.
+private fun isMail(file: VirtualFile) = !file.isDirectory &&
+    (file.extension.equals("eml", ignoreCase = true) || file.extension.equals("msg", ignoreCase = true))
 
 class MailPreviewEditorProvider : FileEditorProvider, DumbAware {
     override fun accept(project: Project, file: VirtualFile) = isMail(file)
     override fun createEditor(project: Project, file: VirtualFile): FileEditor = MailPreviewEditor(project, file)
     override fun getEditorTypeId() = "mail-view-preview"
+    override fun getPolicy() = FileEditorPolicy.PLACE_BEFORE_DEFAULT_EDITOR
+}
+
+class MailHeaderEditorProvider : FileEditorProvider, DumbAware {
+    override fun accept(project: Project, file: VirtualFile) = isMail(file)
+    override fun createEditor(project: Project, file: VirtualFile): FileEditor = MailHeaderEditor(project, file)
+    override fun getEditorTypeId() = "mail-view-headers"
     override fun getPolicy() = FileEditorPolicy.PLACE_BEFORE_DEFAULT_EDITOR
 }
 

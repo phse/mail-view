@@ -33,6 +33,8 @@ class ParsedMail(
     /** Content-ID (ohne spitze Klammern) → eingebettetes Bild, für cid:-Verweise im HTML. */
     val inlineParts: Map<String, MailAttachment>,
     val attachments: List<MailAttachment>,
+    /** Alle Kopfzeilen im Original (gefaltet), bei .msg die Transport-Header; null, wenn keine vorliegen. */
+    val headers: String? = null,
 )
 
 /**
@@ -47,6 +49,7 @@ object MailParser {
     })
 
     fun parse(bytes: ByteArray): ParsedMail {
+        if (MsgParser.isMsg(bytes)) return MsgParser.parse(bytes)
         val message = MimeMessage(session, ByteArrayInputStream(bytes))
         val collector = Collector()
         collector.walk(message)
@@ -62,6 +65,7 @@ object MailParser {
             text = collector.text,
             inlineParts = collector.inline,
             attachments = collector.attachments,
+            headers = message.allHeaderLines.toList().joinToString("\n").takeIf { it.isNotBlank() },
         )
     }
 
