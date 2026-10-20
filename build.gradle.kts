@@ -35,9 +35,16 @@ repositories {
     }
 }
 
+// slf4j bringt die IDE selbst mit; eine zweite Kopie im Plugin führt zu Classloader-Konflikten.
+configurations.runtimeClasspath {
+    exclude(group = "org.slf4j")
+}
+
 dependencies {
     // MIME-Parser (RFC 5322/2045 ff.), wird ins Plugin gepackt.
     implementation("org.eclipse.angus:angus-mail:2.0.3")
+    // RTF → HTML für Outlook-.msg ohne HTML-Teil (.msg selbst liest der eigene CfbReader).
+    implementation("com.github.bbottema:rtf-to-html:1.1.1")
     testImplementation("junit:junit:4.13.2")
 
     intellijPlatform {
@@ -59,6 +66,13 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.2.0</h3>
+            <ul>
+              <li>Outlook <b>.msg</b> files open like .eml: header, rendered message (HTML, plain text or RTF),
+                  embedded images and attachments. Own lightweight reader, the plugin stays below 1 MB.</li>
+              <li>New <b>Headers</b> tab with all header lines of the mail (Received chain, authentication results, ...).</li>
+              <li>Clearer description: read-only, so your mails stay untouched.</li>
+            </ul>
             <h3>0.1.1</h3>
             <ul>
               <li>No deprecated API anymore; softer dark display of mails.</li>

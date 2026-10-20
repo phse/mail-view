@@ -5,17 +5,17 @@
 
     <description><![CDATA[
 <p>
-  Read <b>.eml</b> files right in your IDE.
-  <b>Mail View</b> shows a saved e-mail the way a mail client does: subject, sender, recipients and the message itself,
-  instead of encoded MIME text.
+  Read <b>.eml</b> and Outlook <b>.msg</b> files like in a mail client, right in your IDE - read-only, so your mails stay untouched.
+  <b>Mail View</b> shows subject, sender, recipients, the rendered message and attachments instead of encoded MIME text.
 </p>
 
-<h3>Three views, switchable at the bottom of the editor</h3>
+<h3>Views, switchable at the bottom of the editor</h3>
 <ul>
   <li><b>Mail</b> (default): subject, from, to, CC, BCC, reply-to and date, followed by the rendered message.
       Embedded images are shown, remote content is blocked until you allow it. Attachments can be opened or saved.</li>
   <li><b>Content</b>: the decoded HTML or plain text part, with syntax highlighting.</li>
-  <li><b>Text</b>: the raw file, read-only by default so a mail can't be changed by accident. <i>Edit</i> in the bar above unlocks it; changes show up in the other views right away.</li>
+  <li><b>Headers</b>: all header lines, e.g. the Received chain and authentication results.</li>
+  <li><b>Text</b>: the raw file, read-only by default so a mail can't be changed by accident. <i>Edit</i> in the bar above unlocks it; changes show up in the other views right away. (.eml only; .msg is a binary format.)</li>
 </ul>
 
 <p>Links in a message open in your system browser. Scripts never run.</p>
@@ -33,10 +33,14 @@
     <extensions defaultExtensionNs="com.intellij">
         <fileType name="EML" implementationClass="app.heckit.ide.mailview.EmlFileType" fieldName="INSTANCE"
                   extensions="eml"/>
+        <fileType name="Outlook MSG" implementationClass="app.heckit.ide.mailview.MsgFileType" fieldName="INSTANCE"
+                  extensions="msg"/>
         <fileEditorProvider id="mail-view-preview" order="first"
                             implementation="app.heckit.ide.mailview.MailPreviewEditorProvider"/>
         <fileEditorProvider id="mail-view-content" order="after mail-view-preview"
                             implementation="app.heckit.ide.mailview.MailContentEditorProvider"/>
+        <fileEditorProvider id="mail-view-headers" order="after mail-view-content"
+                            implementation="app.heckit.ide.mailview.MailHeaderEditorProvider"/>
         <postStartupActivity implementation="app.heckit.ide.mailview.ScreenshotStarter"/>
         <editorNotificationProvider implementation="app.heckit.ide.mailview.MailEditModeNotificationProvider"/>
     </extensions>

@@ -1,5 +1,6 @@
 package app.heckit.ide.mailview
 
+import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.fileTypes.LanguageFileType
 import com.intellij.openapi.fileTypes.PlainTextLanguage
 import com.intellij.openapi.util.IconLoader
@@ -13,6 +14,16 @@ object EmlFileType : LanguageFileType(PlainTextLanguage.INSTANCE, true) {
     override fun getDefaultExtension(): String = "eml"
     override fun getIcon(): Icon = MailIcons.FILE
     override fun getCharset(file: VirtualFile, content: ByteArray): String? = null
+}
+
+/** Outlook-.msg ist binär (OLE2); angezeigt wird es nur über die Mail-Ansichten. */
+object MsgFileType : FileType {
+    override fun getName(): String = "Outlook MSG"
+    override fun getDescription(): String = MailViewBundle.message("filetype.msg.description")
+    override fun getDefaultExtension(): String = "msg"
+    override fun getIcon(): Icon = MailIcons.FILE
+    override fun isBinary(): Boolean = true
+    override fun isReadOnly(): Boolean = true
 }
 
 object MailIcons {

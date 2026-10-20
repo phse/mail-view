@@ -9,3 +9,6 @@ works without prior written permission.
 
 This product bundles Eclipse Angus Mail and Jakarta Mail/Activation
 (Eclipse Distribution License 1.0, https://eclipse.org/org/documents/edl-v10.php).
+
+This product bundles rtf-to-html by Benny Bottema
+(Apache License 2.0, https://github.com/bbottema/rtf-to-html).

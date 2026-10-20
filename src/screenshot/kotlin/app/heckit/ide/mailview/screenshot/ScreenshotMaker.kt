@@ -63,6 +63,10 @@ object ScreenshotMaker {
         Thread.sleep(2500)
         shot(frame, File(out, "03-content.png"))
 
+        edt { FileEditorManager.getInstance(project).setSelectedEditor(file, "mail-view-headers") }
+        Thread.sleep(2500)
+        shot(frame, File(out, "05-headers.png"))
+
         // Dunkles Theme und dunkle Mail; danach alles wiederherstellen.
         edt {
             theme(laf, dark = true)
