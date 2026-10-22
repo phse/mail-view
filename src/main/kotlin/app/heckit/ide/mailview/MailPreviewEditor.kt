@@ -14,9 +14,9 @@ import javax.swing.JPopupMenu
 import com.intellij.openapi.fileChooser.FileChooserFactory
 import com.intellij.openapi.fileChooser.FileSaverDescriptor
 import com.intellij.openapi.fileEditor.FileEditor
-import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorState
 import com.intellij.ide.highlighter.ArchiveFileType
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.fileTypes.NativeFileType
 import com.intellij.openapi.fileTypes.UnknownFileType
@@ -251,7 +251,7 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
         val fileType = FileTypeManager.getInstance().getFileTypeByFileName(target.name)
         val virtualFile = if (fileType != UnknownFileType.INSTANCE)
             LocalFileSystem.getInstance().refreshAndFindFileByIoFile(target) else null
-        if (virtualFile != null) FileEditorManager.getInstance(project).openFile(virtualFile, true)
+        if (virtualFile != null) OpenFileDescriptor(project, virtualFile).navigate(true)
         else BrowserUtil.open(target.path)
     }
 

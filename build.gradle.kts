@@ -66,6 +66,10 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.3.1</h3>
+            <ul>
+              <li>No deprecated API anymore.</li>
+            </ul>
             <h3>0.3.0</h3>
             <ul>
               <li>Right-click an attachment for more: open, show in file manager, open with the system application, save.
