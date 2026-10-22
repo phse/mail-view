@@ -117,11 +117,18 @@ object MailParser {
             val data = part.inputStream.use { it.readBytes() }
             val mimeType = runCatching { ContentType(part.contentType).baseType.lowercase() }.getOrDefault("application/octet-stream")
             val name = runCatching { part.fileName }.getOrNull()?.let(::decode)
-                ?: if (mimeType == "message/rfc822") "message.eml" else MailViewBundle.message("attachment.unnamed")
+                ?: if (mimeType == "message/rfc822") embeddedName(data) else MailViewBundle.message("attachment.unnamed")
             val attachment = MailAttachment(name, mimeType, data)
             val contentId = runCatching { part.contentID }.getOrNull()?.trim()?.removePrefix("<")?.removeSuffix(">")
             if (contentId != null && !isAttachment(part)) inline[contentId] = attachment
             else attachments += attachment
+        }
+
+        /** Angehängte Mails haben meist keinen Dateinamen; dann den Betreff nehmen, damit mehrere unterscheidbar sind. */
+        private fun embeddedName(data: ByteArray): String {
+            val subject = runCatching { MimeMessage(null, ByteArrayInputStream(data)).subject }.getOrNull()
+                ?.replace(Regex("[\\p{Cntrl}/\\\\:*?\"<>|]"), " ")?.trim()?.take(80)
+            return "${subject?.takeIf { it.isNotEmpty() } ?: "message"}.eml"
         }
 
         private fun readText(part: MimePart): String {

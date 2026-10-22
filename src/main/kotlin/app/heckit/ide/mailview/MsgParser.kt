@@ -43,6 +43,7 @@ object MsgParser {
     private const val SENDER_SMTP_ADDRESS = 0x5D01
     private const val SENT_REPRESENTING_EMAIL = 0x0065
     private const val SENT_REPRESENTING_SMTP_ADDRESS = 0x5D02
+    private const val LAST_MODIFIER_NAME = 0x3FFA
 
     private const val ATTACH_EMBEDDED_MESSAGE = 5
 
@@ -112,13 +113,16 @@ object MsgParser {
         }.getOrNull()?.takeIf { it.isNotBlank() }
     }
 
-    /** Bei Exchange-Absendern ist die Adresse ein X.500-Pfad; dann die SMTP-Adresse oder den From-Header nehmen. */
+    /** Bei Exchange-Absendern ist die Adresse ein X.500-Pfad; dann die SMTP-Adresse oder den From-Header nehmen.
+     * Gesendete Mails ohne Transport-Header (aus „Gesendete Elemente“ gezogen) tragen die SMTP-Adresse oft nur noch
+     * als letzten Bearbeiter - als letzte Möglichkeit, das ist bei solchen Mails der Absender selbst. */
     private fun sender(props: Props, headers: InternetHeaders?): MailAddress? {
         val smtp = props.string(SENDER_SMTP_ADDRESS)?.takeIf(::isSmtp)
             ?: props.string(SENDER_EMAIL)?.takeIf { isSmtp(it) && !props.string(SENDER_ADDRESS_TYPE).equals("EX", ignoreCase = true) }
             ?: props.string(SENT_REPRESENTING_SMTP_ADDRESS)?.takeIf(::isSmtp)
             ?: props.string(SENT_REPRESENTING_EMAIL)?.takeIf(::isSmtp)
             ?: headerAddresses(headers, "From").firstOrNull()?.address?.takeIf(::isSmtp)
+            ?: props.string(LAST_MODIFIER_NAME)?.takeIf(::isSmtp)
         return address(props.string(SENDER_NAME), smtp)
     }
 
