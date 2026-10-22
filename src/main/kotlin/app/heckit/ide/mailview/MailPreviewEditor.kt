@@ -2,15 +2,30 @@ package app.heckit.ide.mailview
 
 import com.intellij.icons.AllIcons
 import com.intellij.ide.BrowserUtil
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
+import com.intellij.openapi.ui.JBMenuItem
+import com.intellij.openapi.ui.JBPopupMenu
+import com.intellij.openapi.ui.Messages
+import java.io.ByteArrayInputStream
+import java.io.IOException
+import java.util.zip.ZipInputStream
+import javax.swing.JPopupMenu
 import com.intellij.openapi.fileChooser.FileChooserFactory
 import com.intellij.openapi.fileChooser.FileSaverDescriptor
 import com.intellij.openapi.fileEditor.FileEditor
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorState
+import com.intellij.ide.highlighter.ArchiveFileType
+import com.intellij.openapi.fileTypes.FileTypeManager
+import com.intellij.openapi.fileTypes.NativeFileType
+import com.intellij.openapi.fileTypes.UnknownFileType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ide.actions.RevealFileAction
 import com.intellij.openapi.actionSystem.ActionManager
@@ -186,6 +201,7 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
             if (attachmentsExpanded) for (attachment in all) {
                 val link = ActionLink("${attachment.name} (${StringUtil.formatFileSize(attachment.data.size.toLong())})") { open(attachment) }
                 link.toolTipText = MailViewBundle.message("attachments.open.tooltip")
+                link.componentPopupMenu = attachmentMenu(attachment)
                 attachmentsPanel.add(link)
                 val save = ActionLink(MailViewBundle.message("attachments.save")) { save(attachment) }
                 attachmentsPanel.add(save)
@@ -201,11 +217,73 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
         mail?.let { updateAttachments(it) }
     }
 
-    private fun open(attachment: MailAttachment) {
+    /** Rechtsklick: alle Wege, auch die, die ein Klick bewusst nicht nimmt (Ausführen, Entpacken). */
+    private fun attachmentMenu(attachment: MailAttachment): JPopupMenu {
+        val menu = JBPopupMenu()
+        fun item(key: String, action: () -> Unit) = menu.add(JBMenuItem(MailViewBundle.message(key)).apply { addActionListener { action() } })
+        item("attachments.menu.open") { open(attachment) }
+        item("attachments.menu.reveal") { RevealFileAction.openFile(materialize(attachment)) }
+        val extension = File(attachment.name).extension.lowercase()
+        if (extension == "zip") item("attachments.menu.unzip") { unzip(attachment) }
+        if (isRisky(attachment.name)) item("attachments.menu.run") { run(attachment) }
+        else item("attachments.menu.system") { BrowserUtil.open(materialize(attachment).path) }
+        menu.addSeparator()
+        item("attachments.save") { save(attachment) }
+        return menu
+    }
+
+    /** Schreibt den Anhang in einen eigenen Temp-Ordner. */
+    private fun materialize(attachment: MailAttachment): File {
         val dir = FileUtil.createTempDirectory("mail-view", null, true)
-        val target = File(dir, FileUtil.sanitizeFileName(attachment.name, false))
-        target.writeBytes(attachment.data)
-        RevealFileAction.openFile(target)
+        return File(dir, FileUtil.sanitizeFileName(attachment.name, false)).apply { writeBytes(attachment.data) }
+    }
+
+    private fun isRisky(name: String): Boolean {
+        val fileType = FileTypeManager.getInstance().getFileTypeByFileName(name)
+        return File(name).extension.lowercase() in REVEAL_EXTENSIONS || fileType is ArchiveFileType || fileType is NativeFileType
+    }
+
+    private fun open(attachment: MailAttachment) {
+        val target = materialize(attachment)
+        // Archive und Ausführbares nur im Finder/Explorer zeigen, was die IDE kennt (Mails, Bilder, Text, PDF mit
+        // Plugin) im Editor, den Rest mit dem Standardprogramm.
+        if (isRisky(target.name)) return RevealFileAction.openFile(target)
+        val fileType = FileTypeManager.getInstance().getFileTypeByFileName(target.name)
+        val virtualFile = if (fileType != UnknownFileType.INSTANCE)
+            LocalFileSystem.getInstance().refreshAndFindFileByIoFile(target) else null
+        if (virtualFile != null) FileEditorManager.getInstance(project).openFile(virtualFile, true)
+        else BrowserUtil.open(target.path)
+    }
+
+    private fun run(attachment: MailAttachment) {
+        val answer = Messages.showYesNoDialog(project, MailViewBundle.message("attachments.run.warning", attachment.name),
+            MailViewBundle.message("attachments.menu.run"), Messages.getWarningIcon())
+        if (answer == Messages.YES) BrowserUtil.open(materialize(attachment).path)
+    }
+
+    /** Entpackt in einen neuen Ordner neben der Mail (oder einen gewählten) und zeigt ihn im Finder/Explorer. */
+    private fun unzip(attachment: MailAttachment) {
+        val descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor().withTitle(MailViewBundle.message("attachments.unzip.title"))
+        val parent = FileChooser.chooseFile(descriptor, project, file.parent)?.toNioPath()?.toFile() ?: return
+        val base = File(attachment.name).nameWithoutExtension.let { FileUtil.sanitizeFileName(it, false) }
+        val target = generateSequence(0) { it + 1 }.map { File(parent, if (it == 0) base else "$base ($it)") }.first { !it.exists() }
+        try {
+            ZipInputStream(ByteArrayInputStream(attachment.data)).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    val out = File(target, entry.name).canonicalFile
+                    // Zip-Slip: Einträge wie ../../x dürfen nicht aus dem Zielordner heraus.
+                    if (!out.path.startsWith(target.canonicalPath + File.separator)) continue
+                    if (entry.isDirectory) out.mkdirs()
+                    else { out.parentFile.mkdirs(); out.outputStream().use { zip.copyTo(it) } }
+                }
+            }
+        } catch (e: IOException) {
+            Messages.showErrorDialog(project, e.message ?: e.toString(), MailViewBundle.message("attachments.unzip.title"))
+            return
+        }
+        LocalFileSystem.getInstance().refreshAndFindFileByIoFile(parent)?.refresh(true, true)
+        RevealFileAction.openDirectory(target)
     }
 
     private fun save(attachment: MailAttachment) {
@@ -310,6 +388,12 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
     private companion object {
         /** Höher wird der Offscreen-Puffer zu groß (Retina: Breite × Höhe × 16 Byte). */
         const val MAX_SWING_HEIGHT = 8000
+        /** Archive und alles, was beim Öffnen ausgeführt oder installiert würde. */
+        val REVEAL_EXTENSIONS = setOf(
+            "zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "xz", "jar", "war", "dmg", "iso",
+            "exe", "msi", "com", "scr", "bat", "cmd", "ps1", "vbs", "wsf", "hta", "lnk", "url", "reg",
+            "app", "pkg", "command", "sh", "apk",
+        )
         val DARK_BACKGROUND = Color(0x1a1a1a)
         const val HEIGHT_PREFIX = "mail-view:height="
     }

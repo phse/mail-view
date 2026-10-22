@@ -66,6 +66,15 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.3.0</h3>
+            <ul>
+              <li>Right-click an attachment for more: open, show in file manager, open with the system application, save.
+                  ZIP attachments can be extracted (protected against path traversal); executables and installers only run
+                  after a warning.</li>
+              <li>Attached mails are named after their subject instead of <i>message.eml</i>.</li>
+              <li>.msg from Exchange sent items: the sender address is found even without transport headers.</li>
+              <li>New plugin icon.</li>
+            </ul>
             <h3>0.2.0</h3>
             <ul>
               <li>Outlook <b>.msg</b> files open like .eml: header, rendered message (HTML, plain text or RTF),

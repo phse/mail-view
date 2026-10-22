@@ -6,7 +6,6 @@
   </defs>
   <rect x="32" y="32" width="960" height="960" rx="210" fill="url(#g)"/>
   <g fill="none" stroke="#fff" stroke-width="56" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="222" y="302" width="580" height="420" rx="64"/>
-    <path d="M262 352 512 542 692 405"/>
+    <path d="M692 405 512 542 258 349Q232 329 247 314Q259 302 286 302H738A64 64 0 0 1 802 366V658A64 64 0 0 1 738 722H286A64 64 0 0 1 222 658V450"/>
   </g>
 </svg>
