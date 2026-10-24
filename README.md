@@ -6,8 +6,8 @@ Plugin ID `app.heckit.ide.mailview` · Vendor heck\it ([heckit.app](https://heck
 
 ![Mail View](marketplace/screenshots/01-mail.png)
 
-A plugin for JetBrains IDEs (PhpStorm, IntelliJ IDEA, … 2026.1 and later) that opens `.eml`
-and Outlook `.msg` files the way a mail client shows them. Tabs at the bottom of the editor, like
+A plugin for JetBrains IDEs (PhpStorm, IntelliJ IDEA, … 2026.1 and later) that opens `.eml`,
+Outlook `.msg`/`.oft`, Apple Mail `.emlx` and `.mht`/`.mhtml` files the way a mail client shows them. Tabs at the bottom of the editor, like
 *Text | Data* for CSV files:
 
 - **Mail** (default): subject, from, to, CC, BCC, reply-to and date, then the rendered message
@@ -19,12 +19,14 @@ and Outlook `.msg` files the way a mail client shows them. Tabs at the bottom of
 - **Dark** in the bar above the message shows the mail in dark colors. The default follows the IDE
   theme; once switched, the choice applies to all mails.
 - **Content**: the decoded HTML or plain text part (switch at the top), read-only, highlighted.
-- **Headers**: all header lines of the mail (Received chain, authentication results, …), read-only.
+- **Headers**: at the top the SPF, DKIM and DMARC badges and the delivery path (Received chain from sender to recipient) with time and delay per hop; delays over 5 minutes are red. Below, all header lines of the mail, read-only, header names highlighted.
   For `.msg` these are the transport headers Outlook stores for received mails; drafts and sent
   mails have none.
 - **Text**: the raw file in the regular editor, **read-only by default** (view and select only).
   *Edit* in the bar above unlocks it for this file until the IDE restarts; edits show up in the
-  other tabs after a moment. `.eml` only: `.msg` is a binary format and has no *Text* tab.
+  other tabs after a moment. Not for `.msg`/`.oft`: they are a binary format and have no *Text* tab.
+
+Mails attached to a `.msg` are converted to `.eml` and open in Mail View again.
 
 The plugin never writes to the mail file itself; only the unlocked *Text* tab can change an `.eml`.
 The UI is available in English and German.

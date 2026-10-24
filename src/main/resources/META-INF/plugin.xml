@@ -5,7 +5,7 @@
 
     <description><![CDATA[
 <p>
-  Read <b>.eml</b> and Outlook <b>.msg</b> files like in a mail client, right in your IDE - read-only, so your mails stay untouched.
+  Read <b>.eml</b>, Outlook <b>.msg</b>/<b>.oft</b>, Apple Mail <b>.emlx</b> and <b>.mht</b> web archives like in a mail client, right in your IDE - read-only, so your mails stay untouched.
   <b>Mail View</b> shows subject, sender, recipients, the rendered message and attachments instead of encoded MIME text.
 </p>
 
@@ -14,8 +14,8 @@
   <li><b>Mail</b> (default): subject, from, to, CC, BCC, reply-to and date, followed by the rendered message.
       Embedded images are shown, remote content is blocked until you allow it. Attachments can be opened or saved.</li>
   <li><b>Content</b>: the decoded HTML or plain text part, with syntax highlighting.</li>
-  <li><b>Headers</b>: all header lines, e.g. the Received chain and authentication results.</li>
-  <li><b>Text</b>: the raw file, read-only by default so a mail can't be changed by accident. <i>Edit</i> in the bar above unlocks it; changes show up in the other views right away. (.eml only; .msg is a binary format.)</li>
+  <li><b>Headers</b>: SPF/DKIM/DMARC results and the delivery path with the delay of each hop, followed by all header lines.</li>
+  <li><b>Text</b>: the raw file, read-only by default so a mail can't be changed by accident. <i>Edit</i> in the bar above unlocks it; changes show up in the other views right away. (not for .msg/.oft, they are a binary format.)</li>
 </ul>
 
 <p>Links in a message open in your system browser. Scripts never run.</p>
@@ -32,9 +32,9 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <fileType name="EML" implementationClass="app.heckit.ide.mailview.EmlFileType" fieldName="INSTANCE"
-                  extensions="eml"/>
+                  extensions="eml;emlx;mht;mhtml"/>
         <fileType name="Outlook MSG" implementationClass="app.heckit.ide.mailview.MsgFileType" fieldName="INSTANCE"
-                  extensions="msg"/>
+                  extensions="msg;oft"/>
         <fileEditorProvider id="mail-view-preview" order="first"
                             implementation="app.heckit.ide.mailview.MailPreviewEditorProvider"/>
         <fileEditorProvider id="mail-view-content" order="after mail-view-preview"

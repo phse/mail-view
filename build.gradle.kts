@@ -66,6 +66,15 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.4.0</h3>
+            <ul>
+              <li>More formats: Apple Mail <b>.emlx</b>, saved web pages <b>.mht/.mhtml</b> (with their images) and
+                  Outlook templates <b>.oft</b>.</li>
+              <li>Mails attached to a .msg are listed as attachments and open in Mail View again.</li>
+              <li>Headers tab: SPF, DKIM and DMARC results as badges and the delivery path (Received chain) as a table
+                  with time and delay per hop above the header lines; header names are highlighted.</li>
+              <li>Dark mode: no white area below short mails after switching.</li>
+            </ul>
             <h3>0.3.1</h3>
             <ul>
               <li>No deprecated API anymore.</li>
