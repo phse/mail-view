@@ -1,3 +1,11 @@
+Received: from mx2.example.com (mx2.example.com [198.51.100.20])
+	by inbox.example.com with LMTP id 7Hk2c; Mon, 06 Jul 2026 09:14:09 +0200
+Received: from mail.riverside-makers.example (mail.riverside-makers.example [203.0.113.7])
+	by mx2.example.com with ESMTPS id 4f1a9b; Mon, 06 Jul 2026 09:14:06 +0200
+Received: from [192.0.2.15] (laptop.riverside-makers.example [192.0.2.15])
+	by mail.riverside-makers.example with ESMTPSA id 91c2e0; Mon, 06 Jul 2026 09:14:02 +0200
+Authentication-Results: mx2.example.com; spf=pass smtp.mailfrom=riverside-makers.example;
+	dkim=pass header.d=riverside-makers.example header.s=mail; dmarc=pass header.from=riverside-makers.example
 Content-Type: multipart/mixed; boundary="===============5897603572229684954=="
 MIME-Version: 1.0
 Subject: Summer Meetup: program and venue

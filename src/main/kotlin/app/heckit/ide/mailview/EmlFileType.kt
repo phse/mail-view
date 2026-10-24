@@ -26,6 +26,13 @@ object MsgFileType : FileType {
     override fun isReadOnly(): Boolean = true
 }
 
+/** Text-Mailformate (MIME): .eml, Apple-Mail-.emlx, gespeicherte Webseiten .mht/.mhtml. */
+val TEXT_MAIL_EXTENSIONS = setOf("eml", "emlx", "mht", "mhtml")
+/** Binäre Outlook-Formate (OLE2): Mail und Vorlage. */
+val MSG_EXTENSIONS = setOf("msg", "oft")
+
+fun isTextMail(file: VirtualFile) = file.extension?.lowercase() in TEXT_MAIL_EXTENSIONS
+
 object MailIcons {
     @JvmField
     val FILE: Icon = IconLoader.getIcon("/icons/eml.svg", MailIcons::class.java)

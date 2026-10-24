@@ -10,7 +10,7 @@ import com.intellij.openapi.vfs.VirtualFile
 // Beide stehen vor dem normalen Texteditor (Rohdaten); so ergeben sich unten die Reiter Mail | Inhalt | Header | Text.
 // Bei .msg (binär) gibt es keinen Texteditor, dort bleiben Mail | Inhalt | Header.
 private fun isMail(file: VirtualFile) = !file.isDirectory &&
-    (file.extension.equals("eml", ignoreCase = true) || file.extension.equals("msg", ignoreCase = true))
+    (isTextMail(file) || file.extension?.lowercase() in MSG_EXTENSIONS)
 
 class MailPreviewEditorProvider : FileEditorProvider, DumbAware {
     override fun accept(project: Project, file: VirtualFile) = isMail(file)

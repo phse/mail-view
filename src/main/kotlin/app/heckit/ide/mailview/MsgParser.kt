@@ -50,12 +50,14 @@ object MsgParser {
     fun isMsg(bytes: ByteArray): Boolean =
         bytes.size >= OLE_SIGNATURE.size && OLE_SIGNATURE.indices.all { bytes[it] == OLE_SIGNATURE[it] }
 
-    fun parse(bytes: ByteArray): ParsedMail {
-        val root = CfbReader(bytes).root
-        val message = Props(root, headerSize = 32, codepage = null)
+    fun parse(bytes: ByteArray): ParsedMail = parse(CfbReader(bytes).root, headerSize = 32)
+
+    /** [headerSize]: 32 für die Mail selbst, 24 für angehängte Mails (MS-OXMSG 2.4.1). */
+    private fun parse(root: CfbEntry, headerSize: Int): ParsedMail {
+        val message = Props(root, headerSize, codepage = null)
         // 8-Bit-Texte: Codepage der Mail, sonst die für den Internet-Versand.
         val codepage = (message.int(MESSAGE_CODEPAGE) ?: message.int(INTERNET_CODEPAGE))?.let(::charset)
-        val props = Props(root, 32, codepage)
+        val props = Props(root, headerSize, codepage)
         // Nur bei empfangenen Mails vorhanden, nicht bei Entwürfen oder gesendeten Mails.
         val headers = props.string(TRANSPORT_HEADERS)?.trim()?.takeIf { it.isNotEmpty() }
         val parsedHeaders = headers?.let { runCatching { InternetHeaders(ByteArrayInputStream(it.toByteArray(Charsets.UTF_8))) }.getOrNull() }
@@ -68,10 +70,15 @@ object MsgParser {
         val html = html(props)
         val inline = LinkedHashMap<String, MailAttachment>()
         val attachments = ArrayList<MailAttachment>()
-        // Eingebettete Mails (Anhangmethode 5) liegen als eigener Ordner vor und fehlen vorerst.
         root.children.filterKeys { it.startsWith("__attach_version1.0_") }.values.forEach { storage ->
             val attach = Props(storage, 8, codepage)
-            if (attach.int(ATTACH_METHOD) == ATTACH_EMBEDDED_MESSAGE) return@forEach
+            if (attach.int(ATTACH_METHOD) == ATTACH_EMBEDDED_MESSAGE) {
+                // Angehängte Mails liegen als eigener Ordner vor; als .eml weitergereicht, öffnen sie wieder in Mail View.
+                val embedded = storage.child("__substg1.0_3701000D")?.takeIf { it.isStorage } ?: return@forEach
+                val mail = runCatching { parse(embedded, headerSize = 24) }.getOrNull() ?: return@forEach
+                attachments += MailAttachment(embeddedName(mail.subject ?: attach.string(DISPLAY_NAME)), "message/rfc822", EmlWriter.write(mail))
+                return@forEach
+            }
             val data = attach.binary(ATTACH_DATA) ?: return@forEach
             val attachment = MailAttachment(
                 name = attach.string(ATTACH_LONG_FILENAME) ?: attach.string(ATTACH_FILENAME) ?: attach.string(DISPLAY_NAME)
@@ -98,6 +105,11 @@ object MsgParser {
             attachments = attachments,
             headers = headers,
         )
+    }
+
+    private fun embeddedName(subject: String?): String {
+        val clean = subject?.replace(Regex("[\\p{Cntrl}/\\\\:*?\"<>|]"), " ")?.trim()?.take(80)
+        return "${clean?.takeIf { it.isNotEmpty() } ?: "message"}.eml"
     }
 
     private fun html(props: Props): String? {

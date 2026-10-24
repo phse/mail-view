@@ -10,6 +10,8 @@ import java.util.Base64
 
 /** Baut die HTML-Seite der Mail-Ansicht: Kopf mit Absender, Empfängern usw., darunter der Inhalt in einem iframe. */
 object MailHtmlRenderer {
+    /** Verweise in .mht-Seiten: Attribute und CSS-url(), Wert in Gruppe 2 bzw. 3. */
+    private val REFERENCE = Regex("""(?i)\b(src|href|background)\s*=\s*["']([^"']+)["']|url\(\s*["']?([^"')]+)["']?\s*\)""")
     private val REMOTE = Regex("""(?i)(src|background|href)\s*=\s*["']?\s*https?:|url\(\s*["']?\s*https?:""")
 
     // Das iframe bekommt die Höhe seines Inhalts; die Seitenhöhe geht über reportHeight(h) an Swing, das scrollt.
@@ -71,7 +73,7 @@ object MailHtmlRenderer {
         val remote = if (allowRemote) " https: http:" else ""
         // Das Skript gilt nur für die äußere Seite; im iframe verhindert sandbox (ohne allow-scripts) jedes Skript.
         val csp = "default-src 'none'; script-src 'unsafe-inline'; frame-src 'self' about:; img-src data:$remote; " +
-            "style-src 'unsafe-inline'$remote; font-src data:$remote"
+            "style-src 'unsafe-inline' data:$remote; font-src data:$remote"
 
         val rows = buildString {
             row(MailViewBundle.message("header.from"), mail.from)
@@ -91,7 +93,7 @@ object MailHtmlRenderer {
             <meta http-equiv="Content-Security-Policy" content="$csp">
             <style>
               html, body { margin: 0; }
-              html { background: ${if (dark) "#1f1f1f" else "#fff"}; }
+              html { background: ${if (dark) "#1a1a1a" else "#fff"}; }
               header { background: $bg; }
               body { color: $fg;
                      font-family: $FONT_STACK; font-size: ${maxOf(font.size, 13)}px; -webkit-font-smoothing: antialiased; }
@@ -122,6 +124,12 @@ $FIT_SCRIPT</script>
                 val uri = "data:${part.mimeType};base64," + Base64.getEncoder().encodeToString(part.data)
                 result = result.replace("cid:$cid", uri, ignoreCase = true)
             }
+            if (mail.locationParts.isNotEmpty()) result = REFERENCE.replace(result) { match ->
+                val group = match.groups[2] ?: match.groups[3] ?: return@replace match.value
+                val part = locationPart(mail, group.value) ?: return@replace match.value
+                val uri = "data:${part.mimeType};base64," + Base64.getEncoder().encodeToString(part.data)
+                match.value.replaceRange(group.range.first - match.range.first, group.range.last - match.range.first + 1, uri)
+            }
             return base + result
         }
         val text = mail.text ?: ""
@@ -130,8 +138,18 @@ $FIT_SCRIPT</script>
     }
 
     fun unreferencedInline(mail: ParsedMail): List<MailAttachment> {
-        val html = mail.html ?: return mail.inlineParts.values.toList()
-        return mail.inlineParts.filterKeys { !html.contains("cid:$it", ignoreCase = true) }.values.toList()
+        val html = mail.html ?: return mail.inlineParts.values.toList() + mail.locationParts.values
+        val used = REFERENCE.findAll(html).mapNotNull { m -> (m.groups[2] ?: m.groups[3])?.let { locationPart(mail, it.value) } }.toSet()
+        return mail.inlineParts.filterKeys { !html.contains("cid:$it", ignoreCase = true) }.values.toList() +
+            mail.locationParts.values.filter { it !in used }
+    }
+
+    /** Teil zu einem Verweis: gleiche Adresse oder relativer Pfad, der auf die Adresse passt (Word: „Doc_files/image001.png“). */
+    private fun locationPart(mail: ParsedMail, reference: String): MailAttachment? {
+        val ref = reference.trim().removePrefix("./")
+        if (ref.isEmpty() || ref.startsWith("data:") || ref.startsWith("#")) return null
+        mail.locationParts[ref]?.let { return it }
+        return mail.locationParts.entries.firstOrNull { (location, _) -> location.endsWith("/$ref") }?.value
     }
 
     private fun StringBuilder.row(label: String, addresses: List<MailAddress>) {

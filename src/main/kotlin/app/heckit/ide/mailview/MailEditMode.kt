@@ -36,7 +36,7 @@ object MailEditMode {
 /** Balken über dem Reiter „Text“: zeigt den Schreibschutz und schaltet den Bearbeitungsmodus um. */
 class MailEditModeNotificationProvider : EditorNotificationProvider, DumbAware {
     override fun collectNotificationData(project: Project, file: VirtualFile): Function<in FileEditor, out JComponent?>? {
-        if (!file.extension.equals("eml", ignoreCase = true)) return null
+        if (!isTextMail(file)) return null
         return Function { editor ->
             if (editor !is TextEditor) return@Function null
             MailEditMode.apply(file)

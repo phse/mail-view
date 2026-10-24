@@ -35,6 +35,8 @@ class ParsedMail(
     val attachments: List<MailAttachment>,
     /** Alle Kopfzeilen im Original (gefaltet), bei .msg die Transport-Header; null, wenn keine vorliegen. */
     val headers: String? = null,
+    /** Content-Location → Teil, für .mht/.mhtml (Bilder und Styles werden dort über ihre Adresse verknüpft). */
+    val locationParts: Map<String, MailAttachment> = emptyMap(),
 )
 
 /**
@@ -50,7 +52,7 @@ object MailParser {
 
     fun parse(bytes: ByteArray): ParsedMail {
         if (MsgParser.isMsg(bytes)) return MsgParser.parse(bytes)
-        val message = MimeMessage(session, ByteArrayInputStream(bytes))
+        val message = MimeMessage(session, ByteArrayInputStream(stripEmlx(bytes)))
         val collector = Collector()
         collector.walk(message)
         return ParsedMail(
@@ -66,7 +68,19 @@ object MailParser {
             inlineParts = collector.inline,
             attachments = collector.attachments,
             headers = message.allHeaderLines.toList().joinToString("\n").takeIf { it.isNotBlank() },
+            locationParts = collector.locations,
         )
+    }
+
+    /**
+     * Apple Mail (.emlx): erste Zeile ist die Länge der eigentlichen Mail in Bytes, danach folgt eine plist mit
+     * Mail-internen Angaben. Am Inhalt erkannt statt an der Endung, damit auch umbenannte Dateien gehen.
+     */
+    internal fun stripEmlx(bytes: ByteArray): ByteArray {
+        val newline = bytes.indexOf('\n'.code.toByte()).takeIf { it in 1..20 } ?: return bytes
+        val length = String(bytes, 0, newline, Charsets.US_ASCII).trim().toIntOrNull() ?: return bytes
+        val start = newline + 1
+        return bytes.copyOfRange(start, minOf(bytes.size, start + length))
     }
 
     private fun addresses(message: Message, header: String): List<MailAddress> {
@@ -89,6 +103,7 @@ object MailParser {
         var html: String? = null
         var text: String? = null
         val inline = LinkedHashMap<String, MailAttachment>()
+        val locations = LinkedHashMap<String, MailAttachment>()
         val attachments = ArrayList<MailAttachment>()
 
         fun walk(part: MimePart) {
@@ -120,8 +135,13 @@ object MailParser {
                 ?: if (mimeType == "message/rfc822") embeddedName(data) else MailViewBundle.message("attachment.unnamed")
             val attachment = MailAttachment(name, mimeType, data)
             val contentId = runCatching { part.contentID }.getOrNull()?.trim()?.removePrefix("<")?.removeSuffix(">")
-            if (contentId != null && !isAttachment(part)) inline[contentId] = attachment
-            else attachments += attachment
+            val location = runCatching { part.getHeader("Content-Location", null) }.getOrNull()?.let(MimeUtility::unfold)?.trim()
+            when {
+                isAttachment(part) -> attachments += attachment
+                contentId != null -> inline[contentId] = attachment
+                !location.isNullOrEmpty() -> locations[location] = attachment
+                else -> attachments += attachment
+            }
         }
 
         /** Angehängte Mails haben meist keinen Dateinamen; dann den Betreff nehmen, damit mehrere unterscheidbar sind. */

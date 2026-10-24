@@ -97,6 +97,8 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
     private var loading = true
     private val revealTimer = Timer(120) {
         loading = false
+        // Nach einem Umschalten (hell/dunkel) bleibt unter kurzen Seiten sonst das alte Offscreen-Bild stehen.
+        browser?.cefBrowser?.invalidate()
         browserHost.repaint()
     }.apply { isRepeats = false }
     private var dark = MailViewSettings.dark
@@ -156,7 +158,10 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
         if (browser != null) {
             pageHeight = 0
             loading = true
-            browserHost.background = if (dark) DARK_BACKGROUND else Color.WHITE
+            // Alles unter der Seite mit einfärben: Ist das Offscreen-Bild des Browsers kürzer als die Fläche (kurze
+            // Mails), schimmert sonst der helle Hintergrund von Browser-Bauteil oder Viewport durch.
+            val background = if (dark) DARK_BACKGROUND else Color.WHITE
+            listOf(browserHost, browser.component, scrollContent, scrollPane.viewport).forEach { it.background = background }
             scrollPane.verticalScrollBar.value = 0
             browser.loadHTML(MailHtmlRenderer.render(parsed, allowRemote, "console.log('$HEIGHT_PREFIX' + h)", dark))
         }
