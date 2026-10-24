@@ -22,7 +22,7 @@
 
 <p>Works in all JetBrains IDEs based on the IntelliJ Platform (PhpStorm, IntelliJ IDEA, WebStorm, PyCharm, GoLand, ...). UI available in English and German.</p>
 
-<p>Like Mail View? You can <a href="https://ko-fi.com/phse_de">buy me a coffee on Ko-fi</a>. More tools at <a href="https://heckit.app">heckit.app</a>.</p>
+<p>Like Mail View? You can support it via <a href="https://github.com/sponsors/phse">GitHub Sponsors</a> or <a href="https://ko-fi.com/phse_de">buy me a coffee on Ko-fi</a>. More tools at <a href="https://heckit.app">heckit.app</a>.</p>
 ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
