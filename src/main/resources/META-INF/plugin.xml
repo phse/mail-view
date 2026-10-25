@@ -5,7 +5,8 @@
 
     <description><![CDATA[
 <p>
-  Read <b>.eml</b>, Outlook <b>.msg</b>/<b>.oft</b>, Apple Mail <b>.emlx</b> and <b>.mht</b> web archives like in a mail client, right in your IDE - read-only, so your mails stay untouched.
+  Read <b>.eml</b>, Outlook <b>.msg</b>/<b>.oft</b>, Apple Mail <b>.emlx</b> and <b>.mht</b> web archives like in a mail client.
+  Attachments hidden in Outlook's <b>winmail.dat</b> are unpacked automatically, and <b>.mbox</b> archives are listed mail by mail, right in your IDE - read-only, so your mails stay untouched.
   <b>Mail View</b> shows subject, sender, recipients, the rendered message and attachments instead of encoded MIME text.
 </p>
 
@@ -35,12 +36,19 @@
                   extensions="eml;emlx;mht;mhtml"/>
         <fileType name="Outlook MSG" implementationClass="app.heckit.ide.mailview.MsgFileType" fieldName="INSTANCE"
                   extensions="msg;oft"/>
+        <fileType name="Outlook TNEF" implementationClass="app.heckit.ide.mailview.TnefFileType" fieldName="INSTANCE"
+                  extensions="tnef" fileNames="winmail.dat"/>
+        <fileType name="MBOX" implementationClass="app.heckit.ide.mailview.MboxFileType" fieldName="INSTANCE"
+                  extensions="mbox;mbx"/>
+        <fileEditorProvider id="mail-view-mbox" order="first"
+                            implementation="app.heckit.ide.mailview.MboxEditorProvider"/>
         <fileEditorProvider id="mail-view-preview" order="first"
                             implementation="app.heckit.ide.mailview.MailPreviewEditorProvider"/>
         <fileEditorProvider id="mail-view-content" order="after mail-view-preview"
                             implementation="app.heckit.ide.mailview.MailContentEditorProvider"/>
         <fileEditorProvider id="mail-view-headers" order="after mail-view-content"
                             implementation="app.heckit.ide.mailview.MailHeaderEditorProvider"/>
+        <editorFactoryListener implementation="app.heckit.ide.mailview.MboxSeparators"/>
         <postStartupActivity implementation="app.heckit.ide.mailview.ScreenshotStarter"/>
         <editorNotificationProvider implementation="app.heckit.ide.mailview.MailEditModeNotificationProvider"/>
     </extensions>

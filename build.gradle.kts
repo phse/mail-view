@@ -66,6 +66,18 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.5.0</h3>
+            <ul>
+              <li><b>winmail.dat</b> (Outlook TNEF): instead of the single winmail.dat attachment, the files inside are listed
+                  as normal attachments; the formatted text packed into it is shown when the mail has no HTML part.
+                  A winmail.dat file can also be opened on its own.</li>
+              <li><b>.mbox</b> archives (Thunderbird, Google Takeout, mailing list archives): a <i>Mails</i> tab lists
+                  attachments, sender, subject, date and size with a search field. Click a mail to read it below the list
+                  (↑/↓ to browse, with a smooth transition), double-click or Enter opens it in its own tab. Column
+                  widths fit the content; widths you set by hand are kept per file, column order and sorting for all files. In the <i>Text</i> tab a line separates the mails. Large archives are read in the
+                  background, the file is never changed.</li>
+              <li>Attachments unpacked from a winmail.dat are listed under <i>From winmail.dat</i>.</li>
+            </ul>
             <h3>0.4.0</h3>
             <ul>
               <li>More formats: Apple Mail <b>.emlx</b>, saved web pages <b>.mht/.mhtml</b> (with their images) and

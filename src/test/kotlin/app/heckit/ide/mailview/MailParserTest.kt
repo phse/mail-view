@@ -8,7 +8,7 @@ class MailParserTest {
     @Test
     fun parsesSamples() {
         val dir = System.getProperty("mailview.samples")?.let(::File) ?: return
-        dir.walk().filter { it.extension == "eml" || it.extension == "msg" }.forEach { file ->
+        dir.walk().filter { it.extension in setOf("eml", "emlx", "mht", "msg", "oft", "dat", "tnef") }.forEach { file ->
             val mail = try {
                 MailParser.parse(file.readBytes())
             } catch (e: Exception) {

@@ -2,6 +2,7 @@ package app.heckit.ide.mailview.screenshot
 
 import app.heckit.ide.mailview.MailPreviewEditor
 import app.heckit.ide.mailview.MailViewSettings
+import app.heckit.ide.mailview.MboxEditor
 import com.intellij.ide.ui.LafManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
@@ -23,6 +24,7 @@ import javax.swing.JFrame
 object ScreenshotMaker {
     private const val SCALE = 2.0
     private const val MAIL = "summer-meetup.eml"
+    private const val MBOX = "riverside-makers.mbox"
     private val log = logger<ScreenshotMaker>()
 
     @JvmStatic
@@ -66,6 +68,18 @@ object ScreenshotMaker {
         edt { FileEditorManager.getInstance(project).setSelectedEditor(file, "mail-view-headers") }
         Thread.sleep(2500)
         shot(frame, File(out, "05-headers.png"))
+
+        // mbox: Liste mit Vorschau der zweiten Mail.
+        val mbox = edt { project.guessProjectDir()?.findChild(MBOX) ?: error("$MBOX missing") }
+        edt { FileEditorManager.getInstance(project).openFile(mbox, true) }
+        Thread.sleep(2500)
+        edt {
+            FileEditorManager.getInstance(project).setSelectedEditor(mbox, "mail-view-mbox")
+            FileEditorManager.getInstance(project).getEditors(mbox).filterIsInstance<MboxEditor>().first().selectRow(1)
+        }
+        Thread.sleep(5000)
+        shot(frame, File(out, "06-mbox.png"))
+        edt { FileEditorManager.getInstance(project).closeFile(mbox) }
 
         // Dunkles Theme und dunkle Mail; danach alles wiederherstellen.
         edt {

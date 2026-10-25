@@ -28,6 +28,18 @@ Outlook `.msg`/`.oft`, Apple Mail `.emlx` and `.mht`/`.mhtml` files the way a ma
 
 Mails attached to a `.msg` are converted to `.eml` and open in Mail View again.
 
+**winmail.dat** (Outlook TNEF): other mail clients only show this one file. Mail View lists the files inside
+as normal attachments (under *From winmail.dat*) and shows the formatted text packed into it if the mail itself has no HTML part. A
+`winmail.dat` (or `.tnef`) file opens on its own too. Test files: `test-data/hmef` in the Apache POI repository.
+
+**.mbox / .mbx** (Thunderbird, Google Takeout, mailing list archives): the **Mails** tab lists attachments
+(paperclip and count), sender, subject, date and size, sortable, with a search field (all words must appear in
+sender or subject). Column order, widths and sorting are remembered for all mbox files. A click shows the mail
+below the list; ↑/↓ (or the arrows above it) browse in list order. Double-click, Enter or *Open in Tab* opens
+it as its own tab with all views. Mails are written to a temp folder as `.eml`; the mbox itself is never
+changed. In the *Text* tab a line separates the mails (not in edit mode).
+The file is streamed once and only the headers are read, so archives of several GB work too.
+
 The plugin never writes to the mail file itself; only the unlocked *Text* tab can change an `.eml`.
 The UI is available in English and German.
 
@@ -95,8 +107,8 @@ see https://plugins.jetbrains.com/docs/intellij/plugin-signing.html).
 ```
 
 Copies `marketplace/demo-project` to `/Users/Shared/mail-demo` (so no user path shows up in the
-images), opens it in the sandbox and writes five PNGs to `marketplace/screenshots/` (mail, attachments,
-content tab, dark theme, headers tab). The IDE paints its own window for this, no screen recording permission is
+images), opens it in the sandbox and writes six PNGs to `marketplace/screenshots/` (mail, attachments,
+content tab, dark theme, headers tab, mbox list). The IDE paints its own window for this, no screen recording permission is
 needed. The helper lives in `src/screenshot/` and is only compiled with `-Pscreenshots`, never into a
 release. Close any running sandbox first, and close the sandbox afterwards.
 

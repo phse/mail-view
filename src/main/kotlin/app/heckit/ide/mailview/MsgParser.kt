@@ -159,7 +159,7 @@ object MsgParser {
     }
 
     /** Windows-Codepage → Java-Zeichensatz; unbekannte fallen auf windows-1252 zurück. */
-    private fun charset(codepage: Int): Charset {
+    internal fun charset(codepage: Int): Charset {
         val name = when (codepage) {
             65001 -> "UTF-8"
             1200 -> "UTF-16LE"
