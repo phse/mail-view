@@ -11,15 +11,14 @@ interface MailListControls {
     fun move(delta: Int)
     fun position(): String
     fun openInTab()
+    /** Rohdaten der gezeigten Mail, zum Speichern als .eml. */
+    fun currentMail(): ByteArray?
 }
 
 /** Mails aus einer mbox als .eml in eigenen Temp-Ordnern, um sie als Tab zu öffnen. */
 object MailTempFiles {
     fun create(entry: MboxEntry, data: ByteArray): VirtualFile? {
-        val target = File(FileUtil.createTempDirectory("mail-view", null, true), fileName(entry)).apply { writeBytes(data) }
+        val target = File(FileUtil.createTempDirectory("mail-view", null, true), MailExport.emlName(entry.subject)).apply { writeBytes(data) }
         return LocalFileSystem.getInstance().refreshAndFindFileByIoFile(target)
     }
-
-    private fun fileName(entry: MboxEntry): String =
-        (entry.subject?.replace(Regex("[\\p{Cntrl}/\\\\:*?\"<>|]"), " ")?.trim()?.take(80)?.takeIf { it.isNotEmpty() } ?: "message") + ".eml"
 }

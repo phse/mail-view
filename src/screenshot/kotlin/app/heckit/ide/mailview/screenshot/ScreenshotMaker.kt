@@ -1,5 +1,6 @@
 package app.heckit.ide.mailview.screenshot
 
+import com.intellij.ide.util.PropertiesComponent
 import app.heckit.ide.mailview.MailPreviewEditor
 import app.heckit.ide.mailview.MailViewSettings
 import app.heckit.ide.mailview.MboxEditor
@@ -47,6 +48,14 @@ object ScreenshotMaker {
         val file = edt {
             theme(laf, dark = false)
             MailViewSettings.dark = false
+            // Vorgaben, egal was in der Sandbox zuvor eingestellt wurde.
+            MailViewSettings.appearance = MailViewSettings.Appearance.LAST
+            MailViewSettings.preferText = false
+            MailViewSettings.expandAttachments = false
+            MailViewSettings.remoteContent = MailViewSettings.RemoteContent.BLOCK
+            MailViewSettings.rememberTab = false
+            MailViewSettings.startTab = MailViewSettings.StartTab.MAIL
+            PropertiesComponent.getInstance().setValue("mailview.mbox.showTo", false, false)
             frame.extendedState = JFrame.NORMAL
             frame.setBounds(60, 40, 1280, 860)
             project.guessProjectDir()?.findChild(MAIL)?.also { FileEditorManager.getInstance(project).closeFile(it) }

@@ -41,6 +41,7 @@ class MailContentEditor(private val project: Project, private val file: VirtualF
             isUseSoftWraps = true
             isFoldingOutlineShown = true
         }
+        editor.setContextMenuGroupId(MailEditorPopupGroup.ID)
         val group = DefaultActionGroup(KindAction(Kind.HTML, "content.html", AllIcons.FileTypes.Html),
             KindAction(Kind.TEXT, "content.text", AllIcons.FileTypes.Text))
         val toolbar = ActionManager.getInstance().createActionToolbar("MailView.Content", group, true)

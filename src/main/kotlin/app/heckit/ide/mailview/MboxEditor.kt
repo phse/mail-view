@@ -1,6 +1,16 @@
 package app.heckit.ide.mailview
 
 import com.intellij.DynamicBundle
+import com.intellij.icons.AllIcons
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.Separator
+import com.intellij.ui.PopupHandler
+import javax.swing.SwingUtilities
+import com.intellij.openapi.project.DumbAwareAction
+import com.intellij.openapi.project.DumbAwareToggleAction
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditor
@@ -15,9 +25,12 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.AnimatedIcon
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.OnePixelSplitter
-import com.intellij.ui.SearchTextField
+import com.intellij.openapi.util.IconLoader
+import com.intellij.ui.components.fields.ExtendableTextComponent
+import com.intellij.ui.components.fields.ExtendableTextField
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
@@ -32,13 +45,18 @@ import javax.swing.JLabel
 import javax.swing.JViewport
 import javax.swing.table.TableCellRenderer
 import java.awt.Component
+import java.awt.Dimension
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.beans.PropertyChangeListener
 import java.text.DateFormat
+import java.util.Collections
 import java.util.Date
+import java.util.IdentityHashMap
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JComponent
 import javax.swing.JTable
@@ -77,6 +95,7 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
     private var restoring = false
     /** Breiten von Hand gesetzt (für diese Datei gespeichert): dann nicht mehr automatisch anpassen. */
     private var manualWidths = false
+    private lateinit var toColumn: javax.swing.table.TableColumn
     private var userResizing = false
     private val dateFormat = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, DynamicBundle.getLocale())
 
@@ -94,6 +113,7 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
             when (column) {
                 ATTACHMENTS -> it.attachments
                 FROM -> it.from ?: ""
+                TO -> it.to ?: ""
                 SUBJECT -> it.subject ?: MailViewBundle.message("header.noSubject")
                 DATE -> it.date
                 else -> it.size
@@ -104,6 +124,7 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
         setComparator(DATE, nullsFirst(compareBy<Date> { it }))
         setComparator(SUBJECT, String.CASE_INSENSITIVE_ORDER)
         setComparator(FROM, String.CASE_INSENSITIVE_ORDER)
+        setComparator(TO, String.CASE_INSENSITIVE_ORDER)
     }
     private val table = JBTable(model).apply {
         rowSorter = sorter
@@ -141,14 +162,61 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
             override fun keyPressed(e: KeyEvent) { if (e.keyCode == KeyEvent.VK_ENTER) { openSelected(); e.consume() } }
         })
     }
-    private val status = JBLabel().apply { foreground = UIUtil.getContextHelpForeground() }
-    private val search = SearchTextField(false).apply {
-        addDocumentListener(object : DocumentAdapter() {
+    /** Feste Breite (längster möglicher Text), damit das Suchfeld daneben nicht springt, wenn sich die Zahl ändert. */
+    private val status = object : JBLabel() {
+        var reserved = 0
+        override fun getPreferredSize(): Dimension = super.getPreferredSize().let { Dimension(maxOf(it.width, reserved), it.height) }
+    }.apply { foreground = UIUtil.getContextHelpForeground(); horizontalAlignment = SwingConstants.RIGHT }
+    /** Suchfeld mit Lupe links und rechts dem Schalter für die Volltextsuche (wie „Aa“ in der IDE-Suche). */
+    private val search = ExtendableTextField().apply {
+        emptyText.text = MailViewBundle.message("mbox.search")
+        addExtension(object : ExtendableTextComponent.Extension {
+            override fun getIcon(hovered: Boolean): javax.swing.Icon = AllIcons.Actions.Search
+            override fun isIconBeforeText() = true
+        })
+        document.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent) = filter(text)
         })
     }
+    private var fullTextExtension: ExtendableTextComponent.Extension? = null
+
+    /** Eingeschaltet: Icon auf hervorgehobenem Grund, wie gedrückte Schalter in der IDE-Suche. */
+    private class SelectedIcon(private val icon: javax.swing.Icon) : javax.swing.Icon {
+        private val pad = JBUI.scale(3)
+        override fun getIconWidth() = icon.iconWidth + 2 * pad
+        override fun getIconHeight() = icon.iconHeight + 2 * pad
+        override fun paintIcon(c: Component?, g: java.awt.Graphics, x: Int, y: Int) {
+            val g2 = g.create() as java.awt.Graphics2D
+            g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
+            g2.color = JBUI.CurrentTheme.ActionButton.pressedBackground()
+            g2.fillRoundRect(x, y, iconWidth, iconHeight, JBUI.scale(6), JBUI.scale(6))
+            g2.color = JBUI.CurrentTheme.Focus.focusColor()
+            g2.drawRoundRect(x, y, iconWidth - 1, iconHeight - 1, JBUI.scale(6), JBUI.scale(6))
+            g2.dispose()
+            icon.paintIcon(c, g, x + pad, y + pad)
+        }
+    }
+
+    private fun updateFullTextToggle() {
+        fullTextExtension?.let(search::removeExtension)
+        val icon = if (fullText) SelectedIcon(AllIcons.FileTypes.Text) else IconLoader.getDisabledIcon(AllIcons.FileTypes.Text)
+        val tooltip = MailViewBundle.message(if (fullText) "mbox.fullText.on" else "mbox.fullText.off")
+        fullTextExtension = object : ExtendableTextComponent.Extension {
+            override fun getIcon(hovered: Boolean): javax.swing.Icon = if (hovered && !fullText) AllIcons.FileTypes.Text else icon
+            override fun getTooltip() = tooltip
+            override fun getActionOnClick() = Runnable {
+                fullText = !fullText
+                updateFullTextToggle()
+                filter(search.text)
+            }
+        }.also(search::addExtension)
+        search.emptyText.text = MailViewBundle.message(if (fullText) "mbox.search.fullText" else "mbox.search")
+        search.repaint()
+    }
     private val listPanel = BorderLayoutPanel()
-        .addToTop(BorderLayoutPanel().addToCenter(search).addToRight(status.apply { border = JBUI.Borders.emptyLeft(10) })
+        .addToTop(BorderLayoutPanel().addToCenter(search).addToRight(BorderLayoutPanel()
+            .addToCenter(status.apply { border = JBUI.Borders.empty(0, 10, 0, 4) })
+            .addToRight(exportToolbar()))
             .apply { border = JBUI.Borders.empty(6, 8) })
         .addToCenter(JBScrollPane(table).apply { border = JBUI.Borders.customLineTop(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground()) })
     /** Oben die Liste, unten die angeklickte Mail (erst nach dem ersten Klick). */
@@ -160,6 +228,9 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
 
     init {
         restoreLayout()
+        installContextMenu()
+        installHeaderMenu()
+        updateFullTextToggle()
         table.selectionModel.addListSelectionListener { if (!it.valueIsAdjusting) showPreview() }
         table.tableHeader.addMouseMotionListener(object : MouseMotionAdapter() {
             override fun mouseDragged(e: MouseEvent) { if (table.tableHeader.resizingColumn != null) userResizing = true }
@@ -204,10 +275,15 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
         restoring = true
         val props = PropertiesComponent.getInstance()
         val columns = table.columnModel
-        props.getValue(KEY_ORDER)?.split(',')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.sorted() == COLUMNS.indices.toList() }?.let { order ->
-            order.forEachIndexed { target, model ->
+        // „An“ ist ausgeblendet, bis man es über das Kontextmenü im Spaltenkopf einschaltet.
+        toColumn = columns.getColumn(TO)
+        if (!props.getBoolean(KEY_SHOW_TO, false)) columns.removeColumn(toColumn)
+        else columns.moveColumn(columns.columnCount - 1, table.convertColumnIndexToView(FROM) + 1)
+        props.getValue(KEY_ORDER)?.split(',')?.mapNotNull { it.toIntOrNull() }?.let { saved ->
+            val visible = (0 until columns.columnCount).map { columns.getColumn(it).modelIndex }.toSet()
+            saved.filter { it in visible }.distinct().forEachIndexed { target, model ->
                 val current = (0 until columns.columnCount).first { columns.getColumn(it).modelIndex == model }
-                if (current != target) columns.moveColumn(current, target)
+                if (current != target && target < columns.columnCount) columns.moveColumn(current, target)
             }
         }
         val sortColumn = props.getInt(KEY_SORT_COLUMN, DATE).coerceIn(COLUMNS.indices)
@@ -228,6 +304,25 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
                 props.setValue(KEY_SORT_ORDER, it.sortOrder.name)
             }
         }
+    }
+
+    /** Rechtsklick auf den Spaltenkopf: Spalte „An“ ein-/ausblenden. */
+    private fun installHeaderMenu() {
+        val toggle = object : DumbAwareToggleAction(MailViewBundle.message("header.to")) {
+            override fun isSelected(e: AnActionEvent) = toColumn.let { c -> (0 until table.columnModel.columnCount).any { table.columnModel.getColumn(it) === c } }
+            override fun setSelected(e: AnActionEvent, state: Boolean) {
+                val columns = table.columnModel
+                if (state) {
+                    columns.addColumn(toColumn)
+                    columns.moveColumn(columns.columnCount - 1, table.convertColumnIndexToView(FROM) + 1)
+                } else columns.removeColumn(toColumn)
+                PropertiesComponent.getInstance().setValue(KEY_SHOW_TO, state, false)
+                saveLayout()
+                if (!manualWidths) fitColumns()
+            }
+            override fun getActionUpdateThread() = ActionUpdateThread.EDT
+        }
+        PopupHandler.installPopupMenu(table.tableHeader, DefaultActionGroup(toggle), "MailView.MboxHeaderPopup")
     }
 
     private fun saveLayout() {
@@ -252,7 +347,8 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
             ?.takeIf { it.size == COLUMNS.size }
         if (saved == null) return fitColumns()
         manualWidths = true
-        setWidths(saved)
+        // „An“ war beim Speichern ausgeblendet: dann bekommt es eine passende Breite statt 0.
+        setWidths(saved.mapIndexed { i, w -> if (w == 0 && i == TO) JBUI.scale(160) else w })
     }
 
     /**
@@ -264,7 +360,7 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
         val metrics = table.getFontMetrics(table.font)
         val padding = JBUI.scale(16) + 2
         fun header(column: Int): Int {
-            val index = table.convertColumnIndexToView(column)
+            val index = table.convertColumnIndexToView(column).coerceAtLeast(0)
             return table.tableHeader.defaultRenderer.getTableCellRendererComponent(table, model.getColumnName(column), false, false, -1, index)
                 .preferredSize.width
         }
@@ -274,8 +370,11 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
         widths[DATE] = content(DATE)
         widths[SIZE] = content(SIZE)
         val rest = available - widths[ATTACHMENTS] - widths[DATE] - widths[SIZE]
-        widths[FROM] = minOf(content(FROM), rest / 2)
-        widths[SUBJECT] = maxOf(JBUI.scale(80), rest - widths[FROM])
+        // Mit „An“ teilen sich Von und An die Hälfte, die sonst Von allein höchstens bekommt.
+        val showTo = table.convertColumnIndexToView(TO) >= 0
+        widths[FROM] = minOf(content(FROM), if (showTo) rest / 3 else rest / 2)
+        if (showTo) widths[TO] = minOf(content(TO), rest / 3)
+        widths[SUBJECT] = maxOf(JBUI.scale(80), rest - widths[FROM] - widths[TO])
         setWidths(widths.toList())
     }
 
@@ -299,29 +398,159 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
         result.onSuccess {
             entries = it
             model.fireTableDataChanged()
+            val longest = MailViewBundle.message("mbox.count.filtered", it.size, it.size)
+            status.reserved = status.getFontMetrics(status.font).stringWidth(longest) + status.insets.left + status.insets.right
             applyWidths()
             table.emptyText.text = MailViewBundle.message("mbox.empty")
             updateStatus()
+            restoreSelection()
         }.onFailure {
             table.emptyText.text = MailViewBundle.message("preview.error", it.message ?: it.javaClass.simpleName)
         }
     }
 
+    private val selectionKey get() = "mailview.mbox.selected." + file.url.hashCode().toUInt().toString(16)
+
+    /** Beim Wiederöffnen die zuletzt angesehene Mail wieder auswählen (erkannt an ihrer Position in der Datei). */
+    private fun restoreSelection() {
+        if (table.selectedRow >= 0) return
+        val start = PropertiesComponent.getInstance().getValue(selectionKey)?.toLongOrNull() ?: return
+        val index = entries.indexOfFirst { it.start == start }.takeIf { it >= 0 } ?: return
+        val row = table.convertRowIndexToView(index).takeIf { it >= 0 } ?: return
+        table.setRowSelectionInterval(row, row)
+        ApplicationManager.getApplication().invokeLater { table.scrollRectToVisible(table.getCellRect(row, 0, true)) }
+    }
+
     private fun filter(text: String) {
         val words = text.trim().lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val generation = searchGeneration.incrementAndGet()
+        if (words.isNotEmpty() && fullText) return searchText(words, generation)
+        searchProgress = null
         sorter.rowFilter = if (words.isEmpty()) null else object : RowFilter<AbstractTableModel, Int>() {
             override fun include(entry: Entry<out AbstractTableModel, out Int>): Boolean {
                 val e = entries[entry.identifier]
-                val haystack = "${e.from ?: ""} ${e.subject ?: ""}".lowercase()
+                val haystack = "${e.from ?: ""} ${e.to ?: ""} ${e.subject ?: ""}".lowercase()
                 return words.all { it in haystack }
             }
         }
         updateStatus()
     }
 
+    // Volltextsuche: Mails im Hintergrund lesen, Text (ohne HTML) zwischenspeichern; die Liste füllt sich nach und nach.
+    private var fullText = false
+    private val searchGeneration = AtomicInteger()
+    private val textCache = ConcurrentHashMap<MboxEntry, String>()
+    private var searchProgress: Int? = null
+    private var spinner: ExtendableTextComponent.Extension? = null
+
+    private fun searchText(words: List<String>, generation: Int) {
+        val all = entries
+        val matches = Collections.newSetFromMap(IdentityHashMap<MboxEntry, Boolean>())
+        fun publish(done: Int) {
+            val snapshot = matches.toSet()
+            ApplicationManager.getApplication().invokeLater({
+                if (generation != searchGeneration.get()) return@invokeLater
+                searchProgress = if (done < all.size) done * 100 / maxOf(1, all.size) else null
+                sorter.rowFilter = object : RowFilter<AbstractTableModel, Int>() {
+                    override fun include(entry: Entry<out AbstractTableModel, out Int>) = entries[entry.identifier] in snapshot
+                }
+                updateStatus()
+            }, { cancelled.get() })
+        }
+        searchProgress = 0
+        updateStatus()
+        ApplicationManager.getApplication().executeOnPooledThread {
+            var last = System.currentTimeMillis()
+            all.forEachIndexed { i, entry ->
+                if (generation != searchGeneration.get() || cancelled.get()) return@executeOnPooledThread
+                val text = textCache.getOrPut(entry) { plainText(entry) }
+                if (words.all { it in text }) matches += entry
+                if (System.currentTimeMillis() - last > 250) { publish(i + 1); last = System.currentTimeMillis() }
+            }
+            publish(all.size)
+        }
+    }
+
+    /** Absender, Empfänger, Betreff und Text der Mail in Kleinbuchstaben (HTML ohne Tags), höchstens 200.000 Zeichen. */
+    private fun plainText(entry: MboxEntry): String = runCatching {
+        val mail = MailParser.parse(read(entry))
+        listOfNotNull(entry.from, entry.to, entry.subject, mail.text ?: mail.html?.let { StringUtil.stripHtml(it, true) })
+            .joinToString(" ").lowercase().take(200_000)
+    }.getOrDefault("${entry.from ?: ""} ${entry.to ?: ""} ${entry.subject ?: ""}".lowercase())
+
     private fun updateStatus() {
-        status.text = if (table.rowCount == entries.size) MailViewBundle.message("mbox.count", entries.size)
+        val count = if (table.rowCount == entries.size) MailViewBundle.message("mbox.count", entries.size)
         else MailViewBundle.message("mbox.count.filtered", table.rowCount, entries.size)
+        status.text = count
+        // Volltextsuche läuft: kleiner Spinner im Suchfeld statt Fortschrittstext (meist nur einen Augenblick sichtbar).
+        val searching = searchProgress != null
+        if (searching != (spinner != null)) {
+            spinner?.let(search::removeExtension)
+            spinner = if (searching) object : ExtendableTextComponent.Extension {
+                override fun getIcon(hovered: Boolean): javax.swing.Icon = AnimatedIcon.Default.INSTANCE
+                override fun getTooltip() = MailViewBundle.message("mbox.searching.tooltip")
+            }.also(search::addExtension) else null
+        }
+    }
+
+    /** Markierte Mails in Listenreihenfolge (Kontextmenü). */
+    private fun selectedEntries(): List<MboxEntry> =
+        table.selectedRows.sorted().map { entries[table.convertRowIndexToModel(it)] }
+
+    /** Buttons neben der Suche: immer die ganze mbox. */
+    private fun exportToolbar(): JComponent {
+        val group = DefaultActionGroup(
+            ExportAllAction("export.attachments", AllIcons.Actions.Download) { dir -> MailExport.exportAttachments(project, entries, ::read, dir) },
+            ExportAllAction("export.eml", AllIcons.Actions.MenuSaveall) { dir -> MailExport.exportEml(project, entries, ::read, dir) },
+        )
+        return ActionManager.getInstance().createActionToolbar("MailView.Mbox", group, true).also { it.targetComponent = table }.component
+    }
+
+    private inner class ExportAllAction(private val key: String, icon: javax.swing.Icon, private val export: (java.io.File) -> Unit) :
+        DumbAwareAction(MailViewBundle.message("$key.all"), null, icon) {
+        override fun actionPerformed(e: AnActionEvent) {
+            if (entries.isEmpty()) return
+            export(MailExport.chooseFolder(project, file.parent, "$key.title") ?: return)
+        }
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = entries.isNotEmpty()
+        }
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+    }
+
+    /** Rechtsklick auf Zeilen: öffnen, als .eml speichern, Anhänge speichern - für die markierten Mails. */
+    private fun installContextMenu() {
+        val group = DefaultActionGroup(
+            SelectionAction("mbox.openTab") { openSelected() },
+            Separator.getInstance(),
+            SelectionAction("export.eml.save") { targets ->
+                if (targets.size == 1) MailExport.saveEml(project, file.parent, targets[0].subject, read(targets[0]))
+                else MailExport.chooseFolder(project, file.parent, "export.eml.title.folder")?.let { MailExport.exportEml(project, targets, ::read, it) }
+            },
+            SelectionAction("export.attachments.save") { targets ->
+                MailExport.chooseFolder(project, file.parent, "export.attachments.title")?.let { MailExport.exportAttachments(project, targets, ::read, it) }
+            },
+        )
+        PopupHandler.installPopupMenu(table, group, "MailView.MboxPopup")
+        // Rechtsklick außerhalb der Markierung markiert die Zeile darunter (wie in Mailprogrammen).
+        table.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) {
+                if (!SwingUtilities.isRightMouseButton(e) && !e.isPopupTrigger) return
+                val row = table.rowAtPoint(e.point)
+                if (row >= 0 && !table.isRowSelected(row)) table.setRowSelectionInterval(row, row)
+            }
+        })
+    }
+
+    private inner class SelectionAction(private val key: String, private val run: (List<MboxEntry>) -> Unit) :
+        DumbAwareAction(MailViewBundle.message(key)) {
+        override fun actionPerformed(e: AnActionEvent) = selectedEntries().takeIf { it.isNotEmpty() }?.let(run) ?: Unit
+        override fun update(e: AnActionEvent) {
+            val count = table.selectedRowCount
+            e.presentation.isEnabled = count > 0 && (key != "mbox.openTab" || count == 1)
+            if (count > 1 && key != "mbox.openTab") e.presentation.text = MailViewBundle.message("$key.selected", count)
+        }
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
     }
 
     private fun selectedEntry(): MboxEntry? = table.selectedRow.takeIf { it >= 0 }?.let { entries[table.convertRowIndexToModel(it)] }
@@ -336,6 +565,7 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
         val entry = selectedEntry() ?: return
         if (entry === previewEntry) return
         previewEntry = entry
+        PropertiesComponent.getInstance().setValue(selectionKey, entry.start.toString())
         val request = ++previewRequest
         ApplicationManager.getApplication().executeOnPooledThread {
             val result = runCatching { MailParser.parse(read(entry)) }
@@ -359,6 +589,7 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
         }
         override fun position() = if (table.selectedRow < 0) "" else "${table.selectedRow + 1} / ${table.rowCount}"
         override fun openInTab() = openSelected()
+        override fun currentMail(): ByteArray? = selectedEntry()?.let { runCatching { read(it) }.getOrNull() }
     }
 
     /** Doppelklick, Enter oder „Im Tab öffnen“: die Mail mit allen Reitern (Inhalt, Header, Text) als eigener Tab. */
@@ -395,7 +626,10 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
         const val SUBJECT = 2
         const val DATE = 3
         const val SIZE = 4
-        val COLUMNS = listOf("mbox.attachments", "header.from", "mbox.subject", "header.date", "mbox.size")
+        /** Hinten angehängt, damit gespeicherte Reihenfolgen gültig bleiben; steht beim Einblenden hinter „Von“. */
+        const val TO = 5
+        val COLUMNS = listOf("mbox.attachments", "header.from", "mbox.subject", "header.date", "mbox.size", "header.to")
+        const val KEY_SHOW_TO = "mailview.mbox.showTo"
         const val KEY_ORDER = "mailview.mbox.columns"
         const val KEY_SORT_COLUMN = "mailview.mbox.sortColumn"
         const val KEY_SORT_ORDER = "mailview.mbox.sortOrder"
