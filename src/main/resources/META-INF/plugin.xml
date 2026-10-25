@@ -24,12 +24,18 @@
 <p>Works in all JetBrains IDEs based on the IntelliJ Platform (PhpStorm, IntelliJ IDEA, WebStorm, PyCharm, GoLand, ...). UI available in English and German.</p>
 
 <p>Like Mail View? You can support it via <a href="https://github.com/sponsors/phse">GitHub Sponsors</a> or <a href="https://ko-fi.com/phse_de">buy me a coffee on Ko-fi</a>. More tools at <a href="https://heckit.app">heckit.app</a>.</p>
+
+<p>Missing a feature, have an idea, or just want to share feedback? I would love to hear from you: <a href="mailto:plugin-mail-view@heckit.app">plugin-mail-view@heckit.app</a>.</p>
 ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.jcef</depends>
 
     <resource-bundle>messages.MailViewBundle</resource-bundle>
+
+    <projectListeners>
+        <listener class="app.heckit.ide.mailview.MailTabSelector" topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+    </projectListeners>
 
     <extensions defaultExtensionNs="com.intellij">
         <fileType name="EML" implementationClass="app.heckit.ide.mailview.EmlFileType" fieldName="INSTANCE"
@@ -48,8 +54,16 @@
                             implementation="app.heckit.ide.mailview.MailContentEditorProvider"/>
         <fileEditorProvider id="mail-view-headers" order="after mail-view-content"
                             implementation="app.heckit.ide.mailview.MailHeaderEditorProvider"/>
+        <notificationGroup id="Mail View" displayType="BALLOON" key="notification.group" bundle="messages.MailViewBundle"/>
+        <applicationConfigurable parentId="tools" id="app.heckit.ide.mailview" instance="app.heckit.ide.mailview.MailViewConfigurable"
+                                 key="settings.title" bundle="messages.MailViewBundle"/>
         <editorFactoryListener implementation="app.heckit.ide.mailview.MboxSeparators"/>
+        <editorFactoryListener implementation="app.heckit.ide.mailview.MailTextContextMenu"/>
         <postStartupActivity implementation="app.heckit.ide.mailview.ScreenshotStarter"/>
         <editorNotificationProvider implementation="app.heckit.ide.mailview.MailEditModeNotificationProvider"/>
     </extensions>
+    <actions>
+        <action id="MailView.OpenSettings" class="app.heckit.ide.mailview.OpenMailViewSettingsAction"/>
+        <group id="MailView.EditorPopup" class="app.heckit.ide.mailview.MailEditorPopupGroup"/>
+    </actions>
 </idea-plugin>

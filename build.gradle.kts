@@ -66,6 +66,39 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.6.0</h3>
+            <ul>
+              <li><b>Calendar invitations and contacts</b>: .ics and .vcf attachments are summarized above the mail
+                  (event with time, place and organizer; contact with name, company, mail and phone).</li>
+              <li><b>Save as .eml</b> for Outlook .msg/.oft and winmail.dat (converted, named after the file), and for a
+                  mail in the mbox preview; <b>Save Copy</b> for .eml files (keeps the file name).</li>
+              <li>mbox: right-click mails to open them in a tab, save them as .eml or save their attachments. The buttons
+                  next to the search export the attachments or all mails of the whole mbox. Runs in the background,
+                  existing files are never overwritten.</li>
+              <li><b>Find in the mail</b> (Cmd+F / Ctrl+F): matches in header and text are highlighted, Enter jumps to the
+                  next one.</li>
+              <li><b>Save as PDF</b>: the mail as shown in the Mail tab, always printed light.</li>
+              <li>Headers tab: <b>spam score</b> (SpamAssassin, rspamd) as a badge next to SPF, DKIM and DMARC.</li>
+              <li>mbox: <b>search the mail text</b> (text icon in the search field) and an optional <b>To</b> column
+                  (right-click the column header).</li>
+              <li><b>Open in Mail App</b>: opens the mail in the default mail program (.msg and mbox mails as .eml).</li>
+              <li>Mail links and text selection in the Mail tab work again (mouse input did not reach the embedded
+                  browser since 2026.1).</li>
+              <li>Click an address in the mail header to add it (or all addresses) to your contacts, copy it or write a
+                  mail. Mail View hands a .vcf to the system address book, which creates a new contact or updates an
+                  existing one.</li>
+              <li>Switching dark mode fades over and keeps the scroll position.</li>
+              <li>Opened and saved attachments keep the dot before their extension (was <i>report_pdf</i>), so the IDE and
+                  the system recognize the file type again.</li>
+              <li>HTML/Plain Text and Dark/Light toggles at the top right of the mail content (HTML/Plain Text for mails with both versions).</li>
+              <li>Headers tab shows the sending software and List-Unsubscribe links.</li>
+              <li>Thumbnails for image attachments.</li>
+              <li>mbox remembers the last viewed mail.</li>
+              <li>Settings (Tools | Mail View): appearance on open (last used, IDE theme, light, dark), start tab, remember the last tab per file, plain text instead of HTML, remote content (never, trusted senders, always), expanded attachment list, reveal unknown attachments instead of opening them.</li>
+              <li>"Always for example.com" on the remote content banner adds the sender's domain to the trusted senders.</li>
+              <li>Slim context menus: Copy and Mail View Settings instead of the browser or full editor menu.</li>
+              <li>Feedback address in the description: plugin-mail-view@heckit.app.</li>
+            </ul>
             <h3>0.5.0</h3>
             <ul>
               <li><b>winmail.dat</b> (Outlook TNEF): instead of the single winmail.dat attachment, the files inside are listed
@@ -171,6 +204,8 @@ tasks.runIde {
     } else {
         // ./gradlew runIde -PopenProject=/pfad/zum/projekt öffnet direkt ein Projekt in der Sandbox.
         providers.gradleProperty("openProject").orNull?.let { args(it) }
+        // ./gradlew runIde -PjcefDebugPort=9333 öffnet die DevTools-Schnittstelle der eingebetteten Browser.
+        providers.gradleProperty("jcefDebugPort").orNull?.let { jvmArgs("-Dide.browser.jcef.debug.port=$it") }
     }
 }
 

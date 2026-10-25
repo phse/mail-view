@@ -147,4 +147,82 @@ class FormatsTest {
         val first = MailParser.parse(MboxIndex.read(bytes, entries[0]))
         assertEquals("Hallo\nFrom Berlin mit Gruß\n", first.text)
     }
+
+    @Test
+    fun uniqueNames() {
+        val dir = kotlin.io.path.createTempDirectory().toFile()
+        assertEquals("a.pdf", MailExport.unique(dir, "a.pdf").also { it.writeText("") }.name)
+        assertEquals("a (2).pdf", MailExport.unique(dir, "a.pdf").also { it.writeText("") }.name)
+        assertEquals("a (3).pdf", MailExport.unique(dir, "a.pdf").name)
+        assertEquals("Re  Frage.eml", MailExport.emlName("Re: Frage?"))
+        assertEquals("Bericht 2026.pdf", MailExport.safeName("Bericht 2026.pdf"))
+    }
+
+    @Test
+    fun msgAsEml() {
+        val mail = MailParser.parse(eml.toByteArray())
+        val copy = MailParser.parse(EmlWriter.write(mail))
+        assertEquals(mail.subject, copy.subject)
+        assertEquals(mail.text?.trim(), copy.text?.trim())
+    }
+
+    @Test
+    fun icsAndVcf() {
+        val ics = "BEGIN:VCALENDAR\r\nMETHOD:REQUEST\r\nBEGIN:VEVENT\r\nSUMMARY:Board meeting\\, July\r\n" +
+            "DTSTART;TZID=Europe/Berlin:20260713T180000\r\nDTEND;TZID=Europe/Berlin:20260713T193000\r\n" +
+            "LOCATION:Old Mill\r\n  workshop\r\nORGANIZER;CN=\"Lee: Jordan\":mailto:jordan@example.com\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+        val event = AttachmentPreview.event(ics)!!.text
+        assertTrue(event, event.startsWith("Board meeting, July · "))
+        assertTrue(event, event.contains("Old Mill workshop"))
+        assertTrue(event, event.endsWith("Lee: Jordan"))
+        val vcf = "BEGIN:VCARD\nVERSION:3.0\nN:Lee;Jordan;;;\nORG:Riverside Makers;\nitem1.EMAIL;type=INTERNET:jordan@example.com\nTEL;TYPE=CELL:+49 170 0000000\nEND:VCARD\n"
+        assertEquals("Jordan Lee · Riverside Makers · jordan@example.com · +49 170 0000000", AttachmentPreview.contact(vcf)!!.text)
+    }
+
+    @Test
+    fun vcardFromAddresses() {
+        val card = Contacts.vcard(listOf(MailAddress("Lee, Jordan", "jordan@example.com"), MailAddress(null, "bob@example.com")))
+        assertTrue(card, card.contains("N:Lee;Jordan;;;\r\nFN:Jordan Lee\r\nEMAIL;TYPE=INTERNET:jordan@example.com"))
+        assertTrue(card, card.contains("N:;bob;;;\r\nFN:bob\r\n"))
+        assertEquals("Jordan Lee · jordan@example.com", AttachmentPreview.contact(card)!!.text)
+    }
+
+    @Test
+    fun replyLinks() {
+        val mail = ParsedMail("Re: Frage", listOf(MailAddress("Anna", "anna@example.org")), listOf(MailAddress(null, "me@example.com")),
+            listOf(MailAddress(null, "cc@example.com")), emptyList(), emptyList(), null, null, "Hallo\nWelt", emptyMap(), emptyList())
+        val reply = Compose.link(mail, "reply", "", "Re:", "Fwd:", "{sender}:")!!
+        assertTrue(reply, reply.startsWith("mailto:anna@example.org?subject=Re%3A%20Frage&body="))
+        assertTrue(reply, reply.contains("%3E%20Hallo%0A%3E%20Welt"))
+        val all = Compose.link(mail, "replyAll", "", "Re:", "Fwd:", "{sender}:")!!
+        assertTrue(all, all.startsWith("mailto:anna@example.org?cc=me%40example.com%2Ccc%40example.com&subject=Re%3A%20Frage"))
+        assertTrue(Compose.link(mail, "forward", "", "Re:", "Fwd:", "{sender}:")!!.startsWith("mailto:?subject=Fwd%3A%20Re%3A%20Frage"))
+    }
+
+    @Test
+    fun quoteHeaderTemplate() {
+        val date = java.util.GregorianCalendar(2026, 9, 25, 10, 35).time
+        val mail = ParsedMail("x", listOf(MailAddress("JetBrains (JetBrains Marketplace)", "marketplace@jetbrains.com")), emptyList(), emptyList(),
+            emptyList(), emptyList(), date, null, "Hi", emptyMap(), emptyList())
+        val line = Compose.quoteHeader(mail, "Am {date} um {time} schrieb {sender}:")
+        assertTrue(line, line.endsWith("schrieb JetBrains (JetBrains Marketplace) <marketplace@jetbrains.com>:"))
+        assertTrue(line, line.startsWith("Am ") && line.contains("2026") && line.contains(" um "))
+    }
+
+    @Test
+    fun spamHeaders() {
+        fun of(vararg headers: Pair<String, String>) = HeaderAnalysis.spam { name -> headers.filter { it.first.equals(name, true) }.map { it.second } }
+        val sa = of("X-Spam-Status" to "No, score=-0.1 required=5.0 tests=DKIM_SIGNED")!!
+        assertEquals("spam no -0.1 / 5.0", "${sa.method} ${sa.result} ${sa.detail}")
+        val rspamd = of("X-Spamd-Result" to "default: True [16.20 / 15.00]; R_SPF_FAIL(1.00)")!!
+        assertEquals("yes 16.20 / 15.00", "${rspamd.result} ${rspamd.detail}")
+        assertEquals("yes", of("X-Spam-Flag" to "YES")!!.result)
+        assertEquals(null, of())
+    }
+
+    @Test
+    fun unsubscribeHeader() {
+        assertEquals(listOf("mailto:leave@example.com?subject=unsubscribe", "https://example.com/u/1"),
+            HeaderAnalysis.parseUnsubscribe("<mailto:leave@example.com?subject=unsubscribe>,\n <https://example.com/u/1>, <ftp://x>"))
+    }
 }

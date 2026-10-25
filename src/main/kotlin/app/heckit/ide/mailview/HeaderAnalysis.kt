@@ -13,7 +13,17 @@ class AuthResult(val method: String, val result: String, val detail: String?)
 /** Eine Station der Received-Kette, älteste zuerst; [delayMs] seit der vorherigen Station. */
 class DeliveryHop(val from: String?, val by: String?, val with: String?, val date: Date?, val delayMs: Long?)
 
-class HeaderAnalysis(val auth: List<AuthResult>, val hops: List<DeliveryHop>) {
+/**
+ * [mailer]: Versandprogramm (X-Mailer, User-Agent); [unsubscribe]: Abmelde-Ziele aus List-Unsubscribe (https/mailto),
+ * [oneClick]: Abmelden per Klick ohne Bestätigung (RFC 8058).
+ */
+class HeaderAnalysis(
+    val auth: List<AuthResult>,
+    val hops: List<DeliveryHop>,
+    val mailer: String? = null,
+    val unsubscribe: List<String> = emptyList(),
+    val oneClick: Boolean = false,
+) {
     /** Zeit von der ersten bis zur letzten Station mit Datum. */
     val totalMs: Long?
         get() {
@@ -49,8 +59,44 @@ class HeaderAnalysis(val auth: List<AuthResult>, val hops: List<DeliveryHop>) {
                     ?.let { listOf(AuthResult("spf", it.lowercase(), null)) }.orEmpty()
             }
             val hops = parseHops(all("Received"))
-            return if (auth.isEmpty() && hops.isEmpty()) null else HeaderAnalysis(auth, hops)
+            val checks = auth + listOfNotNull(spam(::all))
+            val mailer = (all("X-Mailer") + all("User-Agent")).firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+            val unsubscribe = all("List-Unsubscribe").firstOrNull()?.let(::parseUnsubscribe).orEmpty()
+            val oneClick = all("List-Unsubscribe-Post").any { it.contains("One-Click", ignoreCase = true) }
+            return if (checks.isEmpty() && hops.isEmpty() && mailer == null && unsubscribe.isEmpty()) null
+            else HeaderAnalysis(checks, hops, mailer, unsubscribe, oneClick)
         }
+
+        private val SCORE = Regex("""(?i)score=(-?[0-9.]+)""")
+        private val REQUIRED = Regex("""(?i)required=(-?[0-9.]+)""")
+        private val RSPAMD = Regex("""(?i)\[\s*(-?[0-9.]+)\s*/\s*(-?[0-9.]+)\s*]""")
+
+        /**
+         * Spam-Bewertung des empfangenden Servers: SpamAssassin (X-Spam-Status, X-Spam-Score, X-Spam-Flag) oder rspamd
+         * (X-Spamd-Result, X-Rspamd-Score). Ergebnis „spam=no/yes“ mit Punkten und Schwelle, soweit angegeben.
+         */
+        internal fun spam(all: (String) -> List<String>): AuthResult? {
+            all("X-Spam-Status").firstOrNull()?.let { status ->
+                val score = SCORE.find(status)?.groupValues?.get(1)
+                val required = REQUIRED.find(status)?.groupValues?.get(1)
+                val yes = status.trim().startsWith("yes", ignoreCase = true)
+                return AuthResult("spam", if (yes) "yes" else "no", listOfNotNull(score, required).joinToString(" / ").ifEmpty { null })
+            }
+            all("X-Spamd-Result").firstOrNull()?.let { result ->
+                val match = RSPAMD.find(result)
+                val yes = result.contains("True", ignoreCase = false)
+                return AuthResult("spam", if (yes) "yes" else "no", match?.let { "${it.groupValues[1]} / ${it.groupValues[2]}" })
+            }
+            val flag = all("X-Spam-Flag").firstOrNull()?.trim()
+            val score = (all("X-Spam-Score") + all("X-Rspamd-Score")).firstOrNull()?.trim()
+            if (flag == null && score == null) return null
+            return AuthResult("spam", if (flag.equals("yes", ignoreCase = true)) "yes" else "no", score)
+        }
+
+        /** „<mailto:…>, <https://…>“ → Ziele in der Reihenfolge des Headers. */
+        internal fun parseUnsubscribe(value: String): List<String> =
+            Regex("<([^>]+)>").findAll(value).map { it.groupValues[1].trim() }
+                .filter { it.startsWith("https:", true) || it.startsWith("http:", true) || it.startsWith("mailto:", true) }.toList()
 
         internal fun parseAuth(value: String): List<AuthResult> = AUTH.findAll(value).map { m ->
             val details = DETAIL.findAll(m.groupValues[3]).associate { it.groupValues[1].lowercase() to it.groupValues[2] }

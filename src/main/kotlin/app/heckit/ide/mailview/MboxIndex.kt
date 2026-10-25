@@ -13,7 +13,7 @@ import java.nio.file.Path
 import java.util.Date
 
 /** Eine Mail in der mbox: Lage in der Datei (ohne die „From “-Trennzeile) und die Angaben für die Liste. */
-class MboxEntry(val start: Long, val end: Long, val subject: String?, val from: String?, val date: Date?, val attachments: Int = 0) {
+class MboxEntry(val start: Long, val end: Long, val subject: String?, val from: String?, val date: Date?, val attachments: Int = 0, val to: String? = null) {
     val size: Long get() = end - start
 }
 
@@ -124,8 +124,13 @@ object MboxIndex {
             runCatching { InternetAddress.parseHeader(raw, false).firstOrNull()?.let { it.personal?.takeIf(String::isNotBlank) ?: it.address } }
                 .getOrNull() ?: value("From")
         }
+        // Empfänger: Namen (sonst Adressen) aller An-Adressen, für die einblendbare Spalte „An“.
+        val to = headers?.getHeader("To", ", ")?.let { raw ->
+            runCatching { InternetAddress.parseHeader(raw, false).joinToString(", ") { it.personal?.takeIf(String::isNotBlank) ?: it.address } }
+                .getOrNull() ?: value("To")
+        }
         val date = headers?.getHeader("Date", null)?.let { runCatching { MailDateFormat().parse(MimeUtility.unfold(it).trim()) }.getOrNull() }
-        return MboxEntry(start, end, value("Subject")?.trim(), from?.trim(), date, attachments)
+        return MboxEntry(start, end, value("Subject")?.trim(), from?.trim(), date, attachments, to?.trim())
     }
 
     private val FROM = "From ".toByteArray()

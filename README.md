@@ -2,7 +2,7 @@
 
 <img src="marketplace/plugin-icon.png" width="360" alt="Mail View icon for light and dark themes">
 
-Plugin ID `app.heckit.ide.mailview` · Vendor heck\it ([heckit.app](https://heckit.app)) · [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35284-mail-view) · Source: https://github.com/phse/mail-view · Support: [GitHub Sponsors](https://github.com/sponsors/phse) or [Ko-fi](https://ko-fi.com/phse_de)
+Plugin ID `app.heckit.ide.mailview` · Vendor heck\it ([heckit.app](https://heckit.app)) · [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35284-mail-view) · Source: https://github.com/phse/mail-view · Support: [GitHub Sponsors](https://github.com/sponsors/phse) or [Ko-fi](https://ko-fi.com/phse_de) · Feedback and feature requests: [plugin-mail-view@heckit.app](mailto:plugin-mail-view@heckit.app)
 
 ![Mail View](marketplace/screenshots/01-mail.png)
 
@@ -12,14 +12,14 @@ Outlook `.msg`/`.oft`, Apple Mail `.emlx` and `.mht`/`.mhtml` files the way a ma
 
 - **Mail** (default): subject, from, to, CC, BCC, reply-to and date, then the rendered message
   (HTML in an embedded browser, plain text otherwise). `cid:` images are embedded, remote content
-  is blocked until *Load remote content* is clicked. Scripts never run. Links open in the system
-  browser.
-- **Attachments** are listed above the message (collapsed, click to expand): click one to open it
-  with the system application, *Save…* to store a copy.
-- **Dark** in the bar above the message shows the mail in dark colors. The default follows the IDE
-  theme; once switched, the choice applies to all mails.
+  is blocked until *Load remote content* is clicked (*Always for example.com* trusts the sender's domain).
+  Scripts never run. Links open in the system browser.
+- **Attachments** are listed above the message (collapsed, click to expand), images with a thumbnail:
+  click one to open it with the system application, *Save…* to store a copy.
+- **HTML / Plain Text** and **Light / Dark** float at the top right of the message (faded until the mouse
+  comes near) and show the active state. They scroll with the mail until they reach the top, then stay.
 - **Content**: the decoded HTML or plain text part (switch at the top), read-only, highlighted.
-- **Headers**: at the top the SPF, DKIM and DMARC badges and the delivery path (Received chain from sender to recipient) with time and delay per hop; delays over 5 minutes are red. Below, all header lines of the mail, read-only, header names highlighted.
+- **Headers**: at the top the SPF, DKIM and DMARC badges, the sending software and *List-Unsubscribe* links, and the delivery path (Received chain from sender to recipient) with time and delay per hop; delays over 5 minutes are red. Below, all header lines of the mail, read-only, header names highlighted.
   For `.msg` these are the transport headers Outlook stores for received mails; drafts and sent
   mails have none.
 - **Text**: the raw file in the regular editor, **read-only by default** (view and select only).
@@ -34,11 +34,37 @@ as normal attachments (under *From winmail.dat*) and shows the formatted text pa
 
 **.mbox / .mbx** (Thunderbird, Google Takeout, mailing list archives): the **Mails** tab lists attachments
 (paperclip and count), sender, subject, date and size, sortable, with a search field (all words must appear in
-sender or subject). Column order, widths and sorting are remembered for all mbox files. A click shows the mail
+sender, recipients or subject; the text icon inside the field also searches the mail text in the background).
+Right-click the column header to show the *To* column. Column order, widths and sorting are remembered for all mbox files,
+the last viewed mail per file. A click shows the mail
 below the list; ↑/↓ (or the arrows above it) browse in list order. Double-click, Enter or *Open in Tab* opens
 it as its own tab with all views. Mails are written to a temp folder as `.eml`; the mbox itself is never
-changed. In the *Text* tab a line separates the mails (not in edit mode).
-The file is streamed once and only the headers are read, so archives of several GB work too.
+changed. In the *Text* tab a line separates the mails (not in edit mode). Right-click mails to open them in a
+tab, save them as `.eml` or save their attachments. The buttons next to the search field export the attachments
+or all mails of the whole mbox into a folder. Existing files are never overwritten (`name (2).pdf`).
+
+**Calendar invitations and contacts**: `.ics` and `.vcf` attachments get a line above the mail with the event
+(title, time, place, organizer) or the contact (name, company, mail, phone), with *Open* and *Save…*.
+**Find** (Cmd+F / Ctrl+F in the *Mail* tab) highlights matches in header and text; Enter / Shift+Enter jump
+between them, Esc closes. **Save as PDF…** prints the mail as shown, always light. The *Headers* tab also shows
+the **spam score** of SpamAssassin or rspamd as a badge.
+
+**Open in Mail App** (bar above the mail) opens the mail in the default mail program; `.msg`/`.oft` and mails from
+an mbox are handed over as `.eml`. There you can reply or forward with the program's own quoting and attachments.
+
+Clicking an address in the mail header (it turns into a button on hover) offers *Add to Contacts…* (that one or all addresses of the mail),
+*Copy Address* and *Write Mail*: Mail View writes a `.vcf` and opens it with the system address book, which
+creates a new contact or updates an existing one.
+
+**Save as .eml**: for `.msg`, `.oft` and `winmail.dat` the *Mail* tab offers *Save as .eml…* (converted with all
+attachments, named after the file); in the mbox preview it saves the mail unchanged; for `.eml` files it is *Save
+Copy…*.
+**Settings** (*Settings | Tools | Mail View*, also in the right-click menus): appearance on open (last used, IDE
+theme, light, dark), start tab or the last tab per file, plain text instead of HTML, remote content (never, from
+trusted senders, always), expanded attachment list, reveal unknown attachments instead of opening them. The
+right-click menus only offer *Copy* and the settings instead of the browser or full editor menu.
+
+The mbox file is streamed once and only the headers are read, so archives of several GB work too.
 
 The plugin never writes to the mail file itself; only the unlocked *Text* tab can change an `.eml`.
 The UI is available in English and German.
