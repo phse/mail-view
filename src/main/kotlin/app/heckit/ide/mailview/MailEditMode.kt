@@ -29,6 +29,7 @@ object MailEditMode {
     fun set(project: Project, file: VirtualFile, editing: Boolean) {
         file.putUserData(EDITING, editing)
         apply(file)
+        if (isMbox(file)) MboxSeparators.refresh(file)
         EditorNotifications.getInstance(project).updateNotifications(file)
     }
 }
@@ -36,7 +37,7 @@ object MailEditMode {
 /** Balken über dem Reiter „Text“: zeigt den Schreibschutz und schaltet den Bearbeitungsmodus um. */
 class MailEditModeNotificationProvider : EditorNotificationProvider, DumbAware {
     override fun collectNotificationData(project: Project, file: VirtualFile): Function<in FileEditor, out JComponent?>? {
-        if (!isTextMail(file)) return null
+        if (!isTextMail(file) && !isMbox(file)) return null
         return Function { editor ->
             if (editor !is TextEditor) return@Function null
             MailEditMode.apply(file)

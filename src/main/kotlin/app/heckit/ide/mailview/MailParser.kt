@@ -18,7 +18,8 @@ import java.util.Properties
 
 class MailAddress(val name: String?, val address: String?)
 
-class MailAttachment(val name: String, val mimeType: String, val data: ByteArray)
+/** [source]: Name des Containers, aus dem der Anhang ausgepackt wurde (winmail.dat), sonst null. */
+class MailAttachment(val name: String, val mimeType: String, val data: ByteArray, val source: String? = null)
 
 class ParsedMail(
     val subject: String?,
@@ -52,6 +53,7 @@ object MailParser {
 
     fun parse(bytes: ByteArray): ParsedMail {
         if (MsgParser.isMsg(bytes)) return MsgParser.parse(bytes)
+        if (TnefParser.isTnef(bytes)) return fromTnef(TnefParser.parse(bytes))
         val message = MimeMessage(session, ByteArrayInputStream(stripEmlx(bytes)))
         val collector = Collector()
         collector.walk(message)
@@ -63,7 +65,7 @@ object MailParser {
             bcc = addresses(message, "Bcc"),
             replyTo = addresses(message, "Reply-To"),
             date = runCatching { message.sentDate }.getOrNull(),
-            html = collector.html,
+            html = collector.html ?: collector.tnefHtml,
             text = collector.text,
             inlineParts = collector.inline,
             attachments = collector.attachments,
@@ -71,6 +73,12 @@ object MailParser {
             locationParts = collector.locations,
         )
     }
+
+    /** Eine einzeln geöffnete winmail.dat: ohne Absender und Empfänger, die stehen nur in der umgebenden Mail. */
+    private fun fromTnef(tnef: TnefContent) = ParsedMail(
+        subject = tnef.subject, from = emptyList(), to = emptyList(), cc = emptyList(), bcc = emptyList(), replyTo = emptyList(),
+        date = tnef.date, html = tnef.html, text = tnef.text, inlineParts = tnef.inlineParts, attachments = tnef.attachments,
+    )
 
     /**
      * Apple Mail (.emlx): erste Zeile ist die Länge der eigentlichen Mail in Bytes, danach folgt eine plist mit
@@ -105,6 +113,8 @@ object MailParser {
         val inline = LinkedHashMap<String, MailAttachment>()
         val locations = LinkedHashMap<String, MailAttachment>()
         val attachments = ArrayList<MailAttachment>()
+        /** Formatierter Text aus einer winmail.dat; gilt nur, wenn die Mail selbst kein HTML hat. */
+        var tnefHtml: String? = null
 
         fun walk(part: MimePart) {
             when {
@@ -133,6 +143,15 @@ object MailParser {
             val mimeType = runCatching { ContentType(part.contentType).baseType.lowercase() }.getOrDefault("application/octet-stream")
             val name = runCatching { part.fileName }.getOrNull()?.let(::decode)
                 ?: if (mimeType == "message/rfc822") embeddedName(data) else MailViewBundle.message("attachment.unnamed")
+            // winmail.dat: statt der einen Datei die Anhänge darin zeigen; ist sie kaputt, bleibt sie als Anhang stehen.
+            if (TnefParser.isTnef(data)) runCatching { TnefParser.parse(data) }.getOrNull()?.let { tnef ->
+                if (tnef.attachments.isNotEmpty() || tnef.inlineParts.isNotEmpty() || tnef.html != null) {
+                    attachments += tnef.attachments.map { MailAttachment(it.name, it.mimeType, it.data, source = name) }
+                    inline.putAll(tnef.inlineParts)
+                    if (tnefHtml == null) tnefHtml = tnef.html
+                    return
+                }
+            }
             val attachment = MailAttachment(name, mimeType, data)
             val contentId = runCatching { part.contentID }.getOrNull()?.trim()?.removePrefix("<")?.removeSuffix(">")
             val location = runCatching { part.getHeader("Content-Location", null) }.getOrNull()?.let(MimeUtility::unfold)?.trim()

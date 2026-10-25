@@ -34,6 +34,11 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.project.DumbAwareToggleAction
+import com.intellij.openapi.project.DumbAwareAction
+import com.intellij.openapi.actionSystem.CustomShortcutSet
+import com.intellij.openapi.actionSystem.Separator
+import java.awt.event.KeyEvent
+import javax.swing.KeyStroke
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.ui.EditorNotificationPanel
 import com.intellij.ui.components.ActionLink
@@ -42,6 +47,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import com.intellij.util.ui.WrapLayout
 import com.intellij.util.ui.components.BorderLayoutPanel
 import org.cef.browser.CefBrowser
@@ -51,7 +57,10 @@ import org.cef.handler.CefDisplayHandlerAdapter
 import org.cef.handler.CefLifeSpanHandlerAdapter
 import org.cef.handler.CefRequestHandlerAdapter
 import org.cef.network.CefRequest
+import java.awt.AlphaComposite
 import java.awt.Color
+import java.awt.Graphics2D
+import java.awt.image.BufferedImage
 import java.awt.Cursor
 import java.awt.Graphics
 import java.awt.Dimension
@@ -69,9 +78,30 @@ import javax.swing.Scrollable
 import javax.swing.SwingUtilities
 import javax.swing.Timer
 
-/** Reiter „Mail“: die Mail so, wie ein Mailprogramm sie zeigt. */
-class MailPreviewEditor(private val project: Project, private val file: VirtualFile) : UserDataHolderBase(), FileEditor {
-    private val root = BorderLayoutPanel()
+/**
+ * Reiter „Mail“: die Mail so, wie ein Mailprogramm sie zeigt. Mit [controls] ist es die Vorschau unter der
+ * mbox-Liste: Die Mail kommt dann über [showMail] statt aus der Datei, und oben stehen Blättern und „Im Tab öffnen“.
+ */
+class MailPreviewEditor(
+    private val project: Project,
+    private val file: VirtualFile,
+    private val controls: MailListControls? = null,
+) : UserDataHolderBase(), FileEditor {
+    /** Beim Blättern liegt das Bild der vorigen Mail über der Ansicht, bis die neue steht, und blendet dann aus. */
+    private var snapshot: BufferedImage? = null
+    private var snapshotAlpha = 1f
+    private val fadeTimer = Timer(16) { fadeStep() }
+    private val root = object : BorderLayoutPanel() {
+        override fun paintChildren(g: Graphics) {
+            super.paintChildren(g)
+            val image = snapshot ?: return
+            val at = SwingUtilities.convertPoint(scrollPane.parent, scrollPane.location, this)
+            val g2 = g.create() as Graphics2D
+            g2.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, snapshotAlpha)
+            g2.drawImage(image, at.x, at.y, scrollPane.width, scrollPane.height, null)
+            g2.dispose()
+        }
+    }
     private val bannerHolder = BorderLayoutPanel()
     private val attachmentsPanel = JPanel(WrapLayout(FlowLayout.LEFT, JBUI.scale(10), JBUI.scale(4)))
     // Seit 2026.x rendert JCEF immer offscreen; scrollt Chromium dann selbst, ruckelt es. Deshalb bekommt der
@@ -97,6 +127,7 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
     private var loading = true
     private val revealTimer = Timer(120) {
         loading = false
+        if (snapshot != null) fadeTimer.start()
         // Nach einem Umschalten (hell/dunkel) bleibt unter kurzen Seiten sonst das alte Offscreen-Bild stehen.
         browser?.cefBrowser?.invalidate()
         browserHost.repaint()
@@ -129,15 +160,55 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
             root.addToCenter(scrollPane)
             val toolbar = ActionManager.getInstance().createActionToolbar("MailView.Mail", DefaultActionGroup(DarkAction()), true)
             toolbar.targetComponent = scrollPane
-            root.addToTop(BorderLayoutPanel().addToTop(toolbar.component).addToCenter(bannerHolder))
+            val bar = BorderLayoutPanel().addToCenter(toolbar.component)
+            controls?.let { controls ->
+                // Rechts: „Im Tab öffnen“ und ganz außen das Blättern.
+                val previous = NavigateAction(controls, -1)
+                val next = NavigateAction(controls, 1)
+                val right = ActionManager.getInstance().createActionToolbar("MailView.MailList",
+                    DefaultActionGroup(OpenInTabAction(controls), Separator.getInstance(), previous, PositionAction(controls), next), true)
+                right.targetComponent = scrollPane
+                bar.addToRight(right.component)
+                // ↑/↓ blättern auch, wenn der Fokus in der Vorschau liegt (in der Liste macht das die Tabelle selbst).
+                previous.registerCustomShortcutSet(CustomShortcutSet(KeyStroke.getKeyStroke(KeyEvent.VK_UP, 0)), root, this)
+                next.registerCustomShortcutSet(CustomShortcutSet(KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0)), root, this)
+            }
+            root.addToTop(BorderLayoutPanel().addToTop(bar).addToCenter(bannerHolder))
             attachmentsPanel.border = JBUI.Borders.customLineBottom(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground())
         } else {
             root.addToCenter(JBScrollPane(fallback))
             attachmentsPanel.border = JBUI.Borders.customLineTop(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground())
             root.addToBottom(attachmentsPanel)
         }
-        MailEditMode.apply(file)
-        MailSource(file, this) { show(it) }
+        if (controls == null) {
+            MailEditMode.apply(file)
+            MailSource(file, this) { show(it) }
+        }
+    }
+
+    /** Vorschau unter der mbox-Liste: neue Mail zeigen, mit Überblendung von der vorigen. */
+    fun showMail(result: Result<ParsedMail>) {
+        if (browser != null && mail != null && scrollPane.width > 0 && scrollPane.height > 0) {
+            val image = UIUtil.createImage(scrollPane, scrollPane.width, scrollPane.height, BufferedImage.TYPE_INT_ARGB)
+            val g = image.createGraphics()
+            scrollPane.paint(g)
+            g.dispose()
+            snapshot = image
+            snapshotAlpha = 1f
+            fadeTimer.stop()
+            // Falls die neue Seite keine Höhe meldet (Fehlertext), trotzdem ausblenden.
+            Timer(800) { if (snapshot != null && !fadeTimer.isRunning) fadeTimer.start() }.apply { isRepeats = false; start() }
+        }
+        show(result)
+    }
+
+    private fun fadeStep() {
+        snapshotAlpha -= 0.12f
+        if (snapshotAlpha <= 0f) {
+            snapshot = null
+            fadeTimer.stop()
+        }
+        root.repaint()
     }
 
     private fun show(result: Result<ParsedMail>) {
@@ -203,7 +274,16 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
             })
             toggle.icon = if (attachmentsExpanded) AllIcons.General.ArrowDown else AllIcons.General.ArrowRight
             attachmentsPanel.add(toggle)
-            if (attachmentsExpanded) for (attachment in all) {
+            // Aus einer winmail.dat ausgepackte Anhänge stehen gesammelt dahinter, mit Herkunft davor.
+            var source: String? = null
+            if (attachmentsExpanded) for (attachment in all.sortedBy { it.source != null }) {
+                if (attachment.source != source) {
+                    source = attachment.source
+                    attachmentsPanel.add(JBLabel(MailViewBundle.message("attachments.from", source ?: "")).apply {
+                        foreground = UIUtil.getContextHelpForeground()
+                        toolTipText = MailViewBundle.message("attachments.from.tooltip", source ?: "")
+                    })
+                }
                 val link = ActionLink("${attachment.name} (${StringUtil.formatFileSize(attachment.data.size.toLong())})") { open(attachment) }
                 link.toolTipText = MailViewBundle.message("attachments.open.tooltip")
                 link.componentPopupMenu = attachmentMenu(attachment)
@@ -357,6 +437,38 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
         override fun getActionUpdateThread() = ActionUpdateThread.EDT
     }
 
+    /** Vorige/nächste Mail der mbox-Liste, in deren aktueller Reihenfolge. */
+    private class NavigateAction(private val controls: MailListControls, private val delta: Int) : DumbAwareAction(
+        MailViewBundle.message(if (delta < 0) "mbox.previous" else "mbox.next"), null,
+        if (delta < 0) AllIcons.General.ArrowUp else AllIcons.General.ArrowDown,
+    ) {
+        override fun actionPerformed(e: AnActionEvent) = controls.move(delta)
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = controls.canMove(delta)
+        }
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+    }
+
+    private class OpenInTabAction(private val controls: MailListControls) :
+        DumbAwareAction(MailViewBundle.message("mbox.openTab"), null, AllIcons.Actions.MoveToWindow) {
+        override fun actionPerformed(e: AnActionEvent) = controls.openInTab()
+        override fun update(e: AnActionEvent) {
+            e.presentation.putClientProperty(ActionUtil.SHOW_TEXT_IN_TOOLBAR, true)
+        }
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+    }
+
+    /** „3 / 303“ zwischen den Pfeilen; nur Anzeige. */
+    private class PositionAction(private val controls: MailListControls) : DumbAwareAction() {
+        override fun actionPerformed(e: AnActionEvent) = Unit
+        override fun update(e: AnActionEvent) {
+            e.presentation.text = controls.position()
+            e.presentation.isEnabled = false
+            e.presentation.putClientProperty(ActionUtil.SHOW_TEXT_IN_TOOLBAR, true)
+        }
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+    }
+
     /** Links aus der Mail im System-Browser öffnen, nie in der Vorschau selbst. */
     private fun installLinkHandling(browser: JBCefBrowser) {
         browser.jbCefClient.addRequestHandler(object : CefRequestHandlerAdapter() {
@@ -388,7 +500,10 @@ class MailPreviewEditor(private val project: Project, private val file: VirtualF
     override fun getFile(): VirtualFile = file
     override fun addPropertyChangeListener(listener: PropertyChangeListener) = Unit
     override fun removePropertyChangeListener(listener: PropertyChangeListener) = Unit
-    override fun dispose() = revealTimer.stop()
+    override fun dispose() {
+        revealTimer.stop()
+        fadeTimer.stop()
+    }
 
     private companion object {
         /** Höher wird der Offscreen-Puffer zu groß (Retina: Breite × Höhe × 16 Byte). */
