@@ -21,6 +21,14 @@ object MailHtmlRenderer {
         function fit() {
           const d = f.contentDocument;
           if (!loaded || !d || !d.documentElement) return;
+          // Das iframe scrollt nicht seitlich: Zu breite Bilder (Outlook gibt width/height fest vor) auf die Breite
+          // verkleinern, sonst ist ihr rechter Teil abgeschnitten. Nur diese, damit Abstandshalter ihre Höhe behalten.
+          const w = d.documentElement.clientWidth;
+          for (const i of d.images) {
+            if (i.getBoundingClientRect().right <= w + 1) continue;
+            i.style.setProperty('max-width', '100%', 'important');
+            i.style.setProperty('height', 'auto', 'important');
+          }
           const h = Math.max(d.documentElement.scrollHeight, d.body ? d.body.scrollHeight : 0);
           if (Math.abs(f.offsetHeight - h) > 1) f.style.height = h + 'px';
           // Nicht documentElement.scrollHeight: Das ist mindestens so hoch wie das Fenster, und das hat noch die Höhe der

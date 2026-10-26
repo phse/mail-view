@@ -66,6 +66,11 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.6.1</h3>
+            <ul>
+              <li>Images wider than the editor (e.g. plans pasted into Outlook mails) are scaled down to fit instead of
+                  being cut off on the right.</li>
+            </ul>
             <h3>0.6.0</h3>
             <ul>
               <li><b>Calendar invitations and contacts</b>: .ics and .vcf attachments are summarized above the mail
