@@ -5,7 +5,7 @@ import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
@@ -43,11 +43,11 @@ class OpenMailFromClipboardAction : DumbAwareAction(
         val files = runCatching { clipboard.getContents<List<File>>(DataFlavor.javaFileListFlavor) }.getOrNull().orEmpty()
             .mapNotNull { LocalFileSystem.getInstance().refreshAndFindFileByIoFile(it) }
             .filter { isTextMail(it) || it.extension?.lowercase() in MSG_EXTENSIONS || isTnefFile(it) || isMbox(it) }
-        if (files.isNotEmpty()) return files.forEach { FileEditorManager.getInstance(project).openFile(it, true) }
+        if (files.isNotEmpty()) return files.forEach { OpenFileDescriptor(project, it).navigate(true) }
 
         val text = clipboard.getContents<String>(DataFlavor.stringFlavor)?.let(ClipboardMail::extract)
             ?: return ClipboardMail.notifyNoMail(project)
-        FileEditorManager.getInstance(project).openFile(ClipboardMail.file(text), true)
+        OpenFileDescriptor(project, ClipboardMail.file(text)).navigate(true)
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
@@ -73,7 +73,7 @@ object ClipboardMail {
     }
 
     fun show(project: Project, document: Document) {
-        extract(document.text)?.let { FileEditorManager.getInstance(project).openFile(file(it), true) }
+        extract(document.text)?.let { OpenFileDescriptor(project, file(it)).navigate(true) }
     }
 
     private val HEADER = Regex("^[A-Za-z0-9-]+:")

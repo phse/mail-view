@@ -66,6 +66,11 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.7.1</h3>
+            <ul>
+              <li>No deprecated API anymore, compatible with 2026.3.</li>
+              <li>Errors and UI freezes can be reported to the developer from the IDE.</li>
+            </ul>
             <h3>0.7.0</h3>
             <ul>
               <li><b>Open Mail from Clipboard</b> (File | Open): copy the source of a mail (Gmail "Show original", Outlook
@@ -192,6 +197,8 @@ intellijPlatform {
         ides {
             platformLocalPath?.let { local(it) }
             create(IntelliJPlatformType.PhpStorm, providers.gradleProperty("verifyOldestVersion").get())
+            // Neueste EAP: Der Marketplace prüft auch neuere Builds und meldet dort Deprecations
+            create(IntelliJPlatformType.PhpStorm, providers.gradleProperty("verifyNewestVersion").get())
         }
     }
 }
