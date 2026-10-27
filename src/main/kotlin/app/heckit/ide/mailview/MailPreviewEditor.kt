@@ -1,11 +1,12 @@
 package app.heckit.ide.mailview
 
 import com.intellij.icons.AllIcons
+import com.intellij.ide.projectView.ProjectView
+import com.intellij.ide.util.PropertiesComponent
 import com.intellij.ide.BrowserUtil
 import com.intellij.ide.actions.RevealFileAction
 import com.intellij.ide.highlighter.ArchiveFileType
 import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.ActionToolbar
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CustomShortcutSet
@@ -28,6 +29,7 @@ import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.ui.JBMenuItem
 import com.intellij.openapi.ui.JBPopupMenu
 import com.intellij.openapi.ui.Messages
@@ -38,19 +40,15 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.IdeFocusManager
+import com.intellij.testFramework.LightVirtualFile
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.EditorNotificationPanel
 import com.intellij.ui.SearchTextField
-import com.intellij.ui.components.ActionLink
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
-import com.intellij.ui.scale.ScaleContext
-import com.intellij.ui.scale.ScaleType
-import com.intellij.util.ui.ImageUtil
-import com.intellij.util.ui.JBImageIcon
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import com.intellij.util.ui.WrapLayout
@@ -64,22 +62,21 @@ import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.MouseInfo
 import java.awt.Rectangle
+import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
+import java.awt.datatransfer.Transferable
+import java.awt.datatransfer.UnsupportedFlavorException
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import java.awt.geom.Area
 import java.awt.image.BufferedImage
 import java.beans.PropertyChangeListener
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
 import java.net.URLDecoder
-import java.util.IdentityHashMap
 import java.util.zip.ZipInputStream
-import javax.imageio.ImageIO
-import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.JPopupMenu
@@ -117,6 +114,8 @@ class MailPreviewEditor(
     /** Beim Blättern liegt das Bild der vorigen Mail über der Ansicht, bis die neue steht, und blendet dann aus. */
     private var snapshot: BufferedImage? = null
     private var snapshotAlpha = 1f
+    /** Bild nur vom sichtbaren Teil der Mail (Anhänge auf-/zuklappen): wandert mit ihr, statt die Ansicht zu decken. */
+    private var snapshotArea: Rectangle? = null
     private val fadeTimer = Timer(16) { fadeStep() }
     private val root = BorderLayoutPanel()
     /**
@@ -130,7 +129,9 @@ class MailPreviewEditor(
             val image = snapshot ?: return
             val g2 = g.create() as Graphics2D
             g2.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, snapshotAlpha)
-            g2.drawImage(image, 0, 0, width, height, null)
+            val area = snapshotArea
+            if (area == null) g2.drawImage(image, 0, 0, width, height, null)
+            else SwingUtilities.convertPoint(browserHost, area.x, area.y, this).let { g2.drawImage(image, it.x, it.y, area.width, area.height, null) }
             g2.dispose()
         }
     }
@@ -143,7 +144,7 @@ class MailPreviewEditor(
         border = JBUI.Borders.compound(JBUI.Borders.customLineBottom(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground()), JBUI.Borders.empty(3, 6))
     }
 
-    private val attachmentsPanel = JPanel(WrapLayout(FlowLayout.LEFT, JBUI.scale(10), JBUI.scale(4)))
+    private val attachmentsPanel = JPanel(VerticalLayout(JBUI.scale(4)))
     // Seit 2026.x rendert JCEF immer offscreen; scrollt Chromium dann selbst, ruckelt es. Deshalb bekommt der
     // Browser die volle Seitenhöhe und Swing scrollt (wie in den anderen Reitern), nur sehr lange Mails nicht.
     private val browser: JBCefBrowser? = if (JBCefApp.isSupported()) JBCefBrowser.createBuilder().build() else null
@@ -254,10 +255,10 @@ class MailPreviewEditor(
             }
             installFind(browser)
             root.addToTop(JPanel(VerticalLayout(0)).apply { add(bar); add(findBar); add(bannerHolder) })
-            attachmentsPanel.border = JBUI.Borders.customLineBottom(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground())
+            attachmentsPanel.border = JBUI.Borders.compound(JBUI.Borders.customLineBottom(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground()), JBUI.Borders.empty(6, 10))
         } else {
             root.addToCenter(JBScrollPane(fallback))
-            attachmentsPanel.border = JBUI.Borders.customLineTop(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground())
+            attachmentsPanel.border = JBUI.Borders.compound(JBUI.Borders.customLineTop(JBUI.CurrentTheme.CustomFrameDecorations.separatorForeground()), JBUI.Borders.empty(6, 10))
             root.addToBottom(attachmentsPanel)
         }
         if (controls == null) {
@@ -280,6 +281,7 @@ class MailPreviewEditor(
             scrollPane.paint(g)
             g.dispose()
             snapshot = image
+            snapshotArea = null
             snapshotAlpha = 1f
             snapshotLayer.isVisible = true
             fadeTimer.stop()
@@ -288,15 +290,33 @@ class MailPreviewEditor(
         }
     }
 
+    private fun takeBrowserSnapshot() {
+        val area = browserHost.visibleRect
+        if (browser == null || loading || area.isEmpty) return
+        val image = UIUtil.createImage(browserHost, area.width, area.height, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        g.translate(-area.x, -area.y)
+        browserHost.paint(g)
+        g.dispose()
+        snapshot = image
+        snapshotArea = area
+        snapshotAlpha = 1f
+        snapshotLayer.isVisible = true
+        fadeTimer.stop()
+        Timer(SNAPSHOT_HOLD) { if (snapshot != null && !fadeTimer.isRunning) fadeTimer.start() }.apply { isRepeats = false; start() }
+    }
+
     private fun fadeStep() {
         snapshotAlpha -= 0.12f
         if (snapshotAlpha <= 0f) {
             snapshot = null
+            snapshotArea = null
             snapshotLayer.isVisible = false
             togglesHost.doLayout()
             fadeTimer.stop()
         }
-        snapshotLayer.repaint()
+        // Über das Elternteil neu zeichnen, sonst legt sich die halb durchsichtige Ebene über ihr eigenes altes Bild.
+        togglesHost.repaint()
     }
 
     private fun show(result: Result<ParsedMail>) {
@@ -377,47 +397,32 @@ class MailPreviewEditor(
             toggle.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
             toggle.addMouseListener(object : MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) {
+                    // Rückt die Mail nach unten, zeichnet der Offscreen-Browser kurz an der alten Stelle bzw.
+                    // verschoben (Ruckeln) - sein Bild wandert deshalb mit, bis er neu gezeichnet hat.
+                    takeBrowserSnapshot()
                     attachmentsExpanded = !attachmentsExpanded
                     updateAttachments(parsed)
                 }
             })
             toggle.icon = if (attachmentsExpanded) AllIcons.General.ArrowDown else AllIcons.General.ArrowRight
             attachmentsPanel.add(toggle)
-            // Aus einer winmail.dat ausgepackte Anhänge stehen gesammelt dahinter, mit Herkunft davor.
-            var source: String? = null
-            if (attachmentsExpanded) for (attachment in all.sortedBy { it.source != null }) {
-                if (attachment.source != source) {
-                    source = attachment.source
-                    attachmentsPanel.add(JBLabel(MailViewBundle.message("attachments.from", source ?: "")).apply {
-                        foreground = UIUtil.getContextHelpForeground()
-                        toolTipText = MailViewBundle.message("attachments.from.tooltip", source ?: "")
-                    })
-                }
-                val link = ActionLink("${attachment.name} (${StringUtil.formatFileSize(attachment.data.size.toLong())})") { open(attachment) }
-                link.toolTipText = MailViewBundle.message("attachments.open.tooltip")
-                thumbnail(attachment)?.let { link.icon = it; link.iconTextGap = JBUI.scale(6) }
-                link.componentPopupMenu = attachmentMenu(attachment)
-                attachmentsPanel.add(link)
-                val save = ActionLink(MailViewBundle.message("attachments.save")) { save(attachment) }
-                attachmentsPanel.add(save)
+            // Kacheln je Herkunft; aus einer winmail.dat ausgepackte Anhänge stehen gesammelt dahinter, mit Überschrift.
+            if (attachmentsExpanded) for ((source, group) in all.groupBy { it.source }.entries.sortedBy { it.key != null }) {
+                if (source != null) attachmentsPanel.add(JBLabel(MailViewBundle.message("attachments.from", source)).apply {
+                    foreground = UIUtil.getContextHelpForeground()
+                    toolTipText = MailViewBundle.message("attachments.from.tooltip", source)
+                })
+                attachmentsPanel.add(JPanel(WrapLayout(FlowLayout.LEFT, JBUI.scale(6), JBUI.scale(3))).apply {
+                    isOpaque = false
+                    // WrapLayout setzt außen denselben Abstand; links bündig mit dem Pfeil oben.
+                    border = JBUI.Borders.empty(0, -6, 0, 0)
+                    for (attachment in group) add(AttachmentChip(attachment, attachmentMenu(attachment), { open(attachment) }, { reveal(attachment) }, { openWithSystem(attachment) },
+                        { FileListTransferable(listOf(materialize(attachment))) }))
+                })
             }
         }
         attachmentsPanel.revalidate()
         attachmentsPanel.repaint()
-    }
-
-    private val thumbnails = IdentityHashMap<MailAttachment, Icon?>()
-
-    /** Kleines Vorschaubild für Bild-Anhänge; scharf auch auf Retina (Bild in Gerätepixeln, als HiDPI markiert). */
-    private fun thumbnail(attachment: MailAttachment): Icon? = thumbnails.getOrPut(attachment) {
-        if (!attachment.mimeType.startsWith("image/") || attachment.data.size > MAX_THUMBNAIL_BYTES) return@getOrPut null
-        val image = runCatching { ImageIO.read(ByteArrayInputStream(attachment.data)) }.getOrNull() ?: return@getOrPut null
-        val context = ScaleContext.create(attachmentsPanel)
-        val scale = context.getScale(ScaleType.SYS_SCALE)
-        val box = JBUI.scale(THUMBNAIL_SIZE) * scale
-        val factor = minOf(box / image.width, box / image.height, scale)
-        val scaled = ImageUtil.scaleImage(image, maxOf(1, (image.width * factor).toInt()), maxOf(1, (image.height * factor).toInt()))
-        JBImageIcon(ImageUtil.ensureHiDPI(scaled, context))
     }
 
     /** Für die Marketplace-Screenshots. */
@@ -552,17 +557,27 @@ class MailPreviewEditor(
     /** Rechtsklick: alle Wege, auch die, die ein Klick bewusst nicht nimmt (Ausführen, Entpacken). */
     private fun attachmentMenu(attachment: MailAttachment): JPopupMenu {
         val menu = JBPopupMenu()
-        fun item(key: String, action: () -> Unit) = menu.add(JBMenuItem(MailViewBundle.message(key)).apply { addActionListener { action() } })
-        item("attachments.menu.open") { open(attachment) }
-        item("attachments.menu.reveal") { RevealFileAction.openFile(materialize(attachment)) }
+        // Swing-Menüs laufen ohne Schreib-Lock der IDE; refreshAndFindFile (Öffnen, Speichern) braucht ihn seit 2026.x.
+        // Mit Sondertaste geht es per Klick direkt; die Taste steht rechts im Eintrag wie ein Tastenkürzel.
+        fun item(key: String, click: ClickModifier? = null, action: () -> Unit) {
+            menu.add(HintMenuItem(MailViewBundle.message(key), click?.hint).apply { addActionListener { ApplicationManager.getApplication().invokeLater(action) } })
+        }
+        item("attachments.menu.open", ClickModifier.OPEN) { open(attachment) }
+        item("attachments.menu.reveal", ClickModifier.REVEAL) { reveal(attachment) }
         val extension = File(attachment.name).extension.lowercase()
         if (extension == "zip") item("attachments.menu.unzip") { unzip(attachment) }
-        if (isRisky(attachment.name)) item("attachments.menu.run") { run(attachment) }
-        else item("attachments.menu.system") { BrowserUtil.open(materialize(attachment).path) }
+        item(if (isRisky(attachment.name)) "attachments.menu.run" else "attachments.menu.system", ClickModifier.SYSTEM) { openWithSystem(attachment) }
         menu.addSeparator()
         item("attachments.save") { save(attachment) }
+        item("attachments.saveToProject") { saveToProject(attachment) }
         return menu
     }
+
+    private fun reveal(attachment: MailAttachment) = RevealFileAction.openFile(materialize(attachment))
+
+    /** Mit dem Systemprogramm öffnen; Ausführbares und Archive nur nach Warnung. */
+    private fun openWithSystem(attachment: MailAttachment) =
+        if (isRisky(attachment.name)) run(attachment) else BrowserUtil.open(materialize(attachment).path)
 
     /** Schreibt den Anhang in einen eigenen Temp-Ordner. */
     private fun materialize(attachment: MailAttachment): File {
@@ -622,9 +637,33 @@ class MailPreviewEditor(
     private fun save(attachment: MailAttachment) {
         val descriptor = FileSaverDescriptor(MailViewBundle.message("attachments.save.title"), "")
         val wrapper = FileChooserFactory.getInstance().createSaveFileDialog(descriptor, project)
-            .save(file.parent, MailExport.safeName(attachment.name)) ?: return
+            .save(file.parent ?: project.guessProjectDir(), MailExport.safeName(attachment.name)) ?: return
         wrapper.file.writeBytes(attachment.data)
         wrapper.virtualFile?.refresh(true, false)
+    }
+
+    /**
+     * Ordner im Projekt wählen (Vorschlag: der zuletzt gewählte), Anhang dort ablegen, ohne zu überschreiben, und im
+     * Projektbaum zeigen.
+     */
+    private fun saveToProject(attachment: MailAttachment) {
+        val base = project.guessProjectDir() ?: return save(attachment)
+        val properties = PropertiesComponent.getInstance(project)
+        val last = properties.getValue(LAST_PROJECT_DIR)?.let { LocalFileSystem.getInstance().findFileByPath(it) }
+        val descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor()
+            .withTitle(MailViewBundle.message("attachments.saveToProject.title")).withRoots(base)
+        val dir = FileChooser.chooseFile(descriptor, project, last ?: base) ?: return
+        properties.setValue(LAST_PROJECT_DIR, dir.path)
+        val target = MailExport.unique(dir.toNioPath().toFile(), attachment.name).apply { writeBytes(attachment.data) }
+        val saved = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(target) ?: return
+        ProjectView.getInstance(project).select(null, saved, true)
+    }
+
+    private class FileListTransferable(private val files: List<File>) : Transferable {
+        override fun getTransferDataFlavors() = arrayOf(DataFlavor.javaFileListFlavor)
+        override fun isDataFlavorSupported(flavor: DataFlavor) = flavor == DataFlavor.javaFileListFlavor
+        override fun getTransferData(flavor: DataFlavor): Any =
+            if (flavor == DataFlavor.javaFileListFlavor) files else throw UnsupportedFlavorException(flavor)
     }
 
     /**
@@ -708,11 +747,14 @@ class MailPreviewEditor(
      */
     private inner class SaveEmlAction : DumbAwareAction(MailViewBundle.message("export.eml.save"), null, AllIcons.Actions.MenuSaveall) {
         private val converts = file.extension?.lowercase() in MSG_EXTENSIONS || isTnefFile(file)
+        // Aus der Zwischenablage: gibt es noch nicht als Datei.
+        private val unsaved = file is LightVirtualFile
 
         override fun actionPerformed(e: AnActionEvent) {
             val parsed = mail ?: return
             when {
                 controls != null -> MailExport.saveEml(project, null, parsed.subject, controls.currentMail() ?: return)
+                unsaved -> MailExport.saveEml(project, project.guessProjectDir(), parsed.subject, file.contentsToByteArray())
                 // Outlook-Datei: Name der Datei übernehmen (winmail.dat sagt nichts, dort den Betreff).
                 converts -> MailExport.saveEml(project, file.parent,
                     if (isTnefFile(file)) parsed.subject else file.nameWithoutExtension, EmlWriter.write(parsed))
@@ -721,7 +763,7 @@ class MailPreviewEditor(
             }
         }
         override fun update(e: AnActionEvent) {
-            e.presentation.text = MailViewBundle.message(if (controls == null && !converts) "export.copy" else "export.eml.save")
+            e.presentation.text = MailViewBundle.message(if (controls == null && !converts && !unsaved) "export.copy" else "export.eml.save")
             e.presentation.isEnabled = mail != null
             e.presentation.putClientProperty(ActionUtil.SHOW_TEXT_IN_TOOLBAR, true)
         }
@@ -872,9 +914,10 @@ class MailPreviewEditor(
     private companion object {
         /** Höher wird der Offscreen-Puffer zu groß (Retina: Breite × Höhe × 16 Byte). */
         const val MAX_SWING_HEIGHT = 8000
-        /** Kantenlänge der Vorschaubilder in der Anhangliste; größere Bilder werden nicht dekodiert. */
-        const val THUMBNAIL_SIZE = 32
-        const val MAX_THUMBNAIL_BYTES = 15 * 1024 * 1024
+        /** So lange liegt das Bild der Mail nach dem Auf-/Zuklappen der Anhänge, bis der Browser neu gezeichnet hat. */
+        const val SNAPSHOT_HOLD = 250
+        /** Zuletzt gewählter Ordner für „In Projekt speichern“, pro Projekt. */
+        const val LAST_PROJECT_DIR = "mailview.attachments.projectDir"
         /** Archive und alles, was beim Öffnen ausgeführt oder installiert würde. */
         val REVEAL_EXTENSIONS = setOf(
             "zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "xz", "jar", "war", "dmg", "iso",

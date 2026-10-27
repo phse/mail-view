@@ -61,9 +61,19 @@
         <editorFactoryListener implementation="app.heckit.ide.mailview.MailTextContextMenu"/>
         <postStartupActivity implementation="app.heckit.ide.mailview.ScreenshotStarter"/>
         <editorNotificationProvider implementation="app.heckit.ide.mailview.MailEditModeNotificationProvider"/>
+        <editorNotificationProvider implementation="app.heckit.ide.mailview.MailSourceNotificationProvider"/>
+        <editorFactoryDocumentListener implementation="app.heckit.ide.mailview.MailSourceDocumentListener"/>
     </extensions>
     <actions>
         <action id="MailView.OpenSettings" class="app.heckit.ide.mailview.OpenMailViewSettingsAction"/>
         <group id="MailView.EditorPopup" class="app.heckit.ide.mailview.MailEditorPopupGroup"/>
+        <action id="MailView.OpenFromClipboard" class="app.heckit.ide.mailview.OpenMailFromClipboardAction">
+            <add-to-group group-id="FileOpenGroup" anchor="last"/>
+        </action>
+        <action id="MailView.ShowInMailView" class="app.heckit.ide.mailview.ShowInMailViewAction" icon="/icons/eml.svg">
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+            <add-to-group group-id="EditorTabPopupMenu" anchor="first"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>
+        </action>
     </actions>
 </idea-plugin>
