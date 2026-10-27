@@ -14,8 +14,11 @@ Outlook `.msg`/`.oft`, Apple Mail `.emlx` and `.mht`/`.mhtml` files the way a ma
   (HTML in an embedded browser, plain text otherwise). `cid:` images are embedded, remote content
   is blocked until *Load remote content* is clicked (*Always for example.com* trusts the sender's domain).
   Scripts never run. Links open in the system browser.
-- **Attachments** are listed above the message (collapsed, click to expand), images with a thumbnail:
-  click one to open it with the system application, *Save…* to store a copy.
+- **Attachments** are listed above the message as tiles (collapsed, click to expand) with the IDE's file type icon,
+  name and size. Click a tile for the menu (open, show in file manager, open with system application, save,
+  *Save to Project…*); ⌘-click opens it directly, ⌥-click shows it in the file manager, ⌃-click opens it with the
+  system application (Ctrl, Alt, Shift on Windows/Linux). Drag a tile into the project tree, Finder/Explorer or
+  another application.
 - **HTML / Plain Text** and **Light / Dark** float at the top right of the message (faded until the mouse
   comes near) and show the active state. They scroll with the mail until they reach the top, then stay.
 - **Content**: the decoded HTML or plain text part (switch at the top), read-only, highlighted.
@@ -59,6 +62,11 @@ creates a new contact or updates an existing one.
 **Save as .eml**: for `.msg`, `.oft` and `winmail.dat` the *Mail* tab offers *Save as .eml…* (converted with all
 attachments, named after the file); in the mbox preview it saves the mail unchanged; for `.eml` files it is *Save
 Copy…*.
+
+**Open Mail from Clipboard** (*File | Open*, or *Find Action*): copy the source of a mail (Gmail *Show original*,
+Outlook *View Message Source*, a mail log) and Mail View shows it as an unsaved `.eml`; *Save as .eml…* keeps it.
+Mail files copied in Finder/Explorer are opened directly. Text files that contain a mail source (e.g. a scratch
+file) show a bar *Show in Mail View*; the same entry is in the context menu of the editor, its tab and the project tree.
 **Settings** (*Settings | Tools | Mail View*, also in the right-click menus): appearance on open (last used, IDE
 theme, light, dark), start tab or the last tab per file, plain text instead of HTML, remote content (never, from
 trusted senders, always), expanded attachment list, reveal unknown attachments instead of opening them. The
@@ -149,6 +157,8 @@ If the sandbox asks on the first run, confirm "Trust Project" once and run the c
 | `MsgParser.kt` | Outlook `.msg` (MS-OXMSG): properties, recipients, attachments, codepages, RTF-only bodies via `rtf-to-html` |
 | `CfbReader.kt` | Read-only reader for the OLE2 container of `.msg` (MS-CFB: FAT, DIFAT, mini stream, directory) |
 | `CompressedRtf.kt` | Decompresses the RTF body of `.msg` (MS-OXRTFCP, LZFu) |
+| `ClipboardMail.kt` | *Open Mail from Clipboard* and *Show in Mail View*: detects mail source, opens it as an unsaved `.eml` |
+| `AttachmentChip.kt` | Attachment tiles: file type icon, click menu with modifier shortcuts, drag image |
 | `MailSource.kt` | Parses in the background and again after edits (unsaved document or file bytes) |
 | `MailHtmlRenderer.kt` | HTML page of the *Mail* tab: header, message in a sandboxed iframe, CSP, dark display |
 | `MailPreviewEditor.kt` | *Mail* tab (JCEF), scrolling, remote content banner, attachments, *Dark* switch |

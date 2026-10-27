@@ -66,6 +66,21 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.7.0</h3>
+            <ul>
+              <li><b>Open Mail from Clipboard</b> (File | Open): copy the source of a mail (Gmail "Show original", Outlook
+                  "View Message Source", a mail log) and read it in Mail View; <i>Save as .eml</i> keeps it. Mail files
+                  copied in Finder/Explorer open directly.</li>
+              <li>Text files that contain a mail source (e.g. pasted into a scratch file) get a bar <b>Show in Mail View</b>;
+                  after dismissing it, the same entry is in the context menu of the editor, the editor tab and the project tree.</li>
+              <li>Attachments as <b>tiles</b> with the IDE's file type icon, name and size instead of a line of links.
+                  Click opens the menu; ⌘-click opens the attachment, ⌥-click shows it in the file manager, ⌃-click opens it
+                  with the system application (Ctrl, Alt, Shift on Windows/Linux). The menu shows these hints on the right.</li>
+              <li>Drag an attachment tile into the project tree, Finder/Explorer or another application.</li>
+              <li>Attachments: <b>Save to Project…</b> in the context menu picks a project folder (remembers the last one)
+                  and selects the file in the project tree.</li>
+              <li>Expanding or collapsing the attachments no longer makes the mail jump.</li>
+            </ul>
             <h3>0.6.1</h3>
             <ul>
               <li>Images wider than the editor (e.g. plans pasted into Outlook mails) are scaled down to fit instead of
