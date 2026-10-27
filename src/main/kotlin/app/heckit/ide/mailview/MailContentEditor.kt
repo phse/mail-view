@@ -1,7 +1,6 @@
 package app.heckit.ide.mailview
 
 import com.intellij.icons.AllIcons
-import com.intellij.ide.highlighter.HtmlFileType
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionUpdateThread
@@ -14,6 +13,7 @@ import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorState
 import com.intellij.openapi.fileTypes.FileType
+import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.project.DumbAwareToggleAction
 import com.intellij.openapi.project.Project
@@ -62,7 +62,8 @@ class MailContentEditor(private val project: Project, private val file: VirtualF
         val (content, type) = when {
             error != null -> MailViewBundle.message("preview.error", error.message ?: error.javaClass.simpleName) to PlainTextFileType.INSTANCE
             kind == Kind.HTML -> (parsed?.html ?: MailViewBundle.message("content.noHtml")) to
-                (if (parsed?.html != null) HtmlFileType.INSTANCE else PlainTextFileType.INSTANCE)
+                // HtmlFileType liegt ab 2026.3 in einem anderen Modul - per Name holen, das geht in allen Versionen.
+                (if (parsed?.html != null) FileTypeManager.getInstance().getStdFileType("HTML") else PlainTextFileType.INSTANCE)
             else -> (parsed?.text ?: MailViewBundle.message("content.noText")) to PlainTextFileType.INSTANCE
         }
         setHighlighter(type)

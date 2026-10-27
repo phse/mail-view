@@ -38,6 +38,8 @@
     </projectListeners>
 
     <extensions defaultExtensionNs="com.intellij">
+        <!-- Fehler- und Freeze-Berichte der Nutzer landen im Marketplace (Reiter Freezes bzw. Errors). -->
+        <errorHandler implementation="com.intellij.diagnostic.JetBrainsMarketplaceErrorReportSubmitter"/>
         <fileType name="EML" implementationClass="app.heckit.ide.mailview.EmlFileType" fieldName="INSTANCE"
                   extensions="eml;emlx;mht;mhtml"/>
         <fileType name="Outlook MSG" implementationClass="app.heckit.ide.mailview.MsgFileType" fieldName="INSTANCE"
