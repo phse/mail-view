@@ -66,6 +66,12 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>0.8.0</h3>
+            <ul>
+              <li><b>Drag mails from Apple Mail</b> (macOS) onto a folder in the project tree to save them as .eml. Mail View
+                  asks before saving and lists each mail with sender, time and subject; mails of a conversation can be
+                  deselected. Needs a one-time permission, requested only via the button in <i>Settings | Tools | Mail View</i>.</li>
+            </ul>
             <h3>0.7.1</h3>
             <ul>
               <li>No deprecated API anymore, compatible with 2026.3.</li>

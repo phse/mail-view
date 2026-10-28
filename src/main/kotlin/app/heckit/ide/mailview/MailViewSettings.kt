@@ -101,6 +101,12 @@ object MailViewSettings {
         get() = PropertiesComponent.getInstance().getValue(QUOTE_KEY) ?: MailViewBundle.message("settings.quoteHeader.default")
         set(value) = PropertiesComponent.getInstance().setValue(QUOTE_KEY, value, MailViewBundle.message("settings.quoteHeader.default"))
 
+    /** Erlaubnis „Automation → Mail“ erteilt: Mails aus Apple Mail in den Projektbaum ziehen (nur macOS). */
+    var mailDrop: Boolean
+        get() = PropertiesComponent.getInstance().getBoolean(MAIL_DROP_KEY, false)
+        set(value) = PropertiesComponent.getInstance().setValue(MAIL_DROP_KEY, value, false)
+
+    private const val MAIL_DROP_KEY = "app.heckit.ide.mailview.mailDrop"
     private const val REMOTE_KEY = "app.heckit.ide.mailview.remoteContent"
     private const val TRUSTED_KEY = "app.heckit.ide.mailview.trustedSenders"
     private const val PREFER_TEXT_KEY = "app.heckit.ide.mailview.preferText"

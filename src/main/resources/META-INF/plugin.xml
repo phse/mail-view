@@ -19,6 +19,8 @@
   <li><b>Text</b>: the raw file, read-only by default so a mail can't be changed by accident. <i>Edit</i> in the bar above unlocks it; changes show up in the other views right away. (not for .msg/.oft, they are a binary format.)</li>
 </ul>
 
+<p><b>macOS:</b> drag mails from Apple Mail onto a folder in the project tree to save them as .eml (after a one-time permission in the settings).</p>
+
 <p>Links in a message open in your system browser. Scripts never run.</p>
 
 <p>Works in all JetBrains IDEs based on the IntelliJ Platform (PhpStorm, IntelliJ IDEA, WebStorm, PyCharm, GoLand, ...). UI available in English and German.</p>
@@ -35,6 +37,7 @@
 
     <projectListeners>
         <listener class="app.heckit.ide.mailview.MailTabSelector" topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+        <listener class="app.heckit.ide.mailview.MailDropInstaller" topic="com.intellij.openapi.wm.ex.ToolWindowManagerListener"/>
     </projectListeners>
 
     <extensions defaultExtensionNs="com.intellij">
@@ -62,6 +65,7 @@
         <editorFactoryListener implementation="app.heckit.ide.mailview.MboxSeparators"/>
         <editorFactoryListener implementation="app.heckit.ide.mailview.MailTextContextMenu"/>
         <postStartupActivity implementation="app.heckit.ide.mailview.ScreenshotStarter"/>
+        <postStartupActivity implementation="app.heckit.ide.mailview.MailDropInstaller$Startup"/>
         <editorNotificationProvider implementation="app.heckit.ide.mailview.MailEditModeNotificationProvider"/>
         <editorNotificationProvider implementation="app.heckit.ide.mailview.MailSourceNotificationProvider"/>
         <editorFactoryDocumentListener implementation="app.heckit.ide.mailview.MailSourceDocumentListener"/>

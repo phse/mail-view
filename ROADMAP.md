@@ -10,6 +10,7 @@ Planned in iterations, one release per step.
    the Received chain as a timeline, SPF/DKIM/DMARC results highlighted.
 3. **Small conveniences** - open mail source from the clipboard, drag attachments into the project,
    *Save to Project…* (0.7.0). Opening several mails via drag & drop already works through the IDE.
+   Drag mails from Apple Mail into the project tree (0.8.0). Next: check Thunderbird and Outlook drops.
 
 ## Later
 

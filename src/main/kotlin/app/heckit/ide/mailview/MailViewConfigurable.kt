@@ -17,7 +17,14 @@ import com.intellij.ui.dsl.builder.toNullableProperty
 import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.ui.layout.not
 import com.intellij.ui.layout.selectedValueIs
+import com.intellij.ide.BrowserUtil
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ApplicationNamesInfo
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.util.SystemInfo
+import javax.swing.JButton
 import javax.swing.JCheckBox
+import javax.swing.JEditorPane
 
 /**
  * Settings | Tools | Mail View: Aussehen beim Öffnen; Kürzel für Antworten/Weiterleiten und die Zeile über dem Zitat
@@ -62,6 +69,39 @@ class MailViewConfigurable : BoundConfigurable(MailViewBundle.message("settings.
                 checkBox(MailViewBundle.message("settings.revealUnknown")).bindSelected(MailViewSettings::revealUnknown)
                     .comment(MailViewBundle.message("settings.revealUnknown.comment"))
             }
+        }
+        if (SystemInfo.isMac) group(MailViewBundle.message("settings.appleMail")) {
+            lateinit var status: Cell<JEditorPane>
+            lateinit var button: Cell<JButton>
+            fun show(state: AppleMail.Permission) {
+                val granted = state == AppleMail.Permission.GRANTED ||
+                    state == AppleMail.Permission.NOT_RUNNING && MailViewSettings.mailDrop
+                val denied = state == AppleMail.Permission.DENIED
+                status.component.text = (when {
+                    granted -> MailViewBundle.message("settings.appleMail.granted")
+                    denied -> MailViewBundle.message("settings.appleMail.denied", ApplicationNamesInfo.getInstance().fullProductName)
+                    else -> MailViewBundle.message("settings.appleMail.ask")
+                })
+                button.component.text = MailViewBundle.message(if (granted || denied) "settings.appleMail.systemSettings" else "settings.appleMail.allow")
+                button.component.isEnabled = true
+            }
+            row { status = text("") }
+            row {
+                button = button("") {
+                    if (button.component.text == MailViewBundle.message("settings.appleMail.allow")) {
+                        button.component.isEnabled = false
+                        button.component.text = MailViewBundle.message("settings.appleMail.requesting")
+                        // Die Abfrage von macOS blockiert, bis entschieden ist.
+                        ApplicationManager.getApplication().executeOnPooledThread {
+                            val state = AppleMail.request()
+                            ApplicationManager.getApplication().invokeLater({ show(state) }, ModalityState.any())
+                        }
+                    } else BrowserUtil.browse(AppleMail.AUTOMATION_SETTINGS)
+                }
+            }
+            val state = AppleMail.permission(false)
+            if (state == AppleMail.Permission.GRANTED || state == AppleMail.Permission.DENIED) MailViewSettings.mailDrop = state == AppleMail.Permission.GRANTED
+            show(state)
         }
         if (MailHtmlRenderer.SHOW_COMPOSE) group(MailViewBundle.message("settings.compose")) {
             row(MailViewBundle.message("settings.replyPrefix")) {
