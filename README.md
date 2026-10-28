@@ -67,6 +67,12 @@ Copy…*.
 Outlook *View Message Source*, a mail log) and Mail View shows it as an unsaved `.eml`; *Save as .eml…* keeps it.
 Mail files copied in Finder/Explorer are opened directly. Text files that contain a mail source (e.g. a scratch
 file) show a bar *Show in Mail View*; the same entry is in the context menu of the editor, its tab and the project tree.
+**Drag mails from Apple Mail** (macOS): drop one or more mails onto a folder in the project tree and Mail View
+saves them there as `.eml`, after asking (each mail as a tile with sender, time and subject; mails of a dragged
+conversation can be deselected). Apple Mail only hands out a file promise that Java can't take, so Mail View reads the
+selected mails from Mail via JavaScript for Automation. macOS asks once for permission (*Automation | Mail*) - only
+after clicking the button in *Settings | Tools | Mail View*, never on its own.
+
 **Settings** (*Settings | Tools | Mail View*, also in the right-click menus): appearance on open (last used, IDE
 theme, light, dark), start tab or the last tab per file, plain text instead of HTML, remote content (never, from
 trusted senders, always), expanded attachment list, reveal unknown attachments instead of opening them. The
@@ -158,6 +164,7 @@ If the sandbox asks on the first run, confirm "Trust Project" once and run the c
 | `CfbReader.kt` | Read-only reader for the OLE2 container of `.msg` (MS-CFB: FAT, DIFAT, mini stream, directory) |
 | `CompressedRtf.kt` | Decompresses the RTF body of `.msg` (MS-OXRTFCP, LZFu) |
 | `ClipboardMail.kt` | *Open Mail from Clipboard* and *Show in Mail View*: detects mail source, opens it as an unsaved `.eml` |
+| `AppleMailDrop.kt` | Drop from Apple Mail into the project tree: permission (Apple Events), drop target in front of the tree's, reading the selection via `osascript`, confirmation dialog |
 | `AttachmentChip.kt` | Attachment tiles: file type icon, click menu with modifier shortcuts, drag image |
 | `MailSource.kt` | Parses in the background and again after edits (unsaved document or file bytes) |
 | `MailHtmlRenderer.kt` | HTML page of the *Mail* tab: header, message in a sandboxed iframe, CSP, dark display |
