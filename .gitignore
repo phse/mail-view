@@ -11,3 +11,6 @@ local.properties
 
 # Logo-Entwürfe bleiben lokal
 marketplace/icon-proposals/
+
+# Roadmap bleibt lokal
+/ROADMAP.md
