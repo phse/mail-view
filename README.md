@@ -136,6 +136,9 @@ uploaded separately. `marketplace/plugin-icon.png` at the top of this README is 
    [Marketplace page](https://plugins.jetbrains.com/plugin/35284-mail-view). JetBrains reviews
    every version before it is released.
 4. Tag the commit (`git tag v<version>`) and push.
+5. If `marketplace/custom-pages/` changed, paste the page into the Marketplace by hand (plugin page,
+   *Custom Pages* tab, Markdown). `publishPlugin` doesn't upload custom pages. `configuration.md` is the
+   *Configuration* tab: file types, settings, fixed behaviour.
 
 Signing is optional (variables `CERTIFICATE_CHAIN`, `PRIVATE_KEY`, `PRIVATE_KEY_PASSWORD`,
 see https://plugins.jetbrains.com/docs/intellij/plugin-signing.html).
