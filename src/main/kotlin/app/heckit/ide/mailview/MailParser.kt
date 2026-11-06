@@ -38,6 +38,8 @@ class ParsedMail(
     val headers: String? = null,
     /** Content-Location → Teil, für .mht/.mhtml (Bilder und Styles werden dort über ihre Adresse verknüpft). */
     val locationParts: Map<String, MailAttachment> = emptyMap(),
+    /** Formathinweise (fehlende Pflicht-Header, offene MIME-Grenzen, Zeichensatz), nur bei MIME-Mails. */
+    val warnings: List<MailWarning> = emptyList(),
 )
 
 /**
@@ -71,6 +73,7 @@ object MailParser {
             attachments = collector.attachments,
             headers = message.allHeaderLines.toList().joinToString("\n").takeIf { it.isNotBlank() },
             locationParts = collector.locations,
+            warnings = MailLint.check(message),
         )
     }
 

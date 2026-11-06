@@ -22,12 +22,18 @@ Outlook `.msg`/`.oft`, Apple Mail `.emlx` and `.mht`/`.mhtml` files the way a ma
 - **HTML / Plain Text** and **Light / Dark** float at the top right of the message (faded until the mouse
   comes near) and show the active state. They scroll with the mail until they reach the top, then stay.
 - **Content**: the decoded HTML or plain text part (switch at the top), read-only, highlighted.
-- **Headers**: at the top the SPF, DKIM and DMARC badges, the sending software and *List-Unsubscribe* links, and the delivery path (Received chain from sender to recipient) with time and delay per hop; delays over 5 minutes are red. Below, all header lines of the mail, read-only, header names highlighted.
+- **Headers**: at the top format warnings (missing Date/Message-ID/From, unparseable date, unterminated MIME boundary, unknown or mismatching charset, unencoded non-ASCII headers; hints only, the file is never changed), then the SPF, DKIM and DMARC badges, the sending software and *List-Unsubscribe* links, and the delivery path (Received chain from sender to recipient) with time and delay per hop; delays over 5 minutes are red. Below, all header lines of the mail, read-only, header names highlighted.
   For `.msg` these are the transport headers Outlook stores for received mails; drafts and sent
   mails have none.
-- **Text**: the raw file in the regular editor, **read-only by default** (view and select only).
+- **Text**: the raw file in the regular editor, **read-only by default** (view and select only). Header
+  names and MIME boundaries are highlighted, every MIME part can be folded (base64 parts start folded), and
+  header values with RFC 2047 encoded words start folded and show the decoded text.
   *Edit* in the bar above unlocks it for this file until the IDE restarts; edits show up in the
   other tabs after a moment. Not for `.msg`/`.oft`: they are a binary format and have no *Text* tab.
+
+**Compare Mails** (project tree, two mails selected): opens both decoded in the IDE diff viewer. Headers are
+unfolded, decoded and sorted by name; text, HTML and attachments (size and SHA-256) follow. Transfer encoding,
+charsets, MIME boundaries and header order don't show up as differences.
 
 Mails attached to a `.msg` are converted to `.eml` and open in Mail View again.
 
@@ -150,8 +156,8 @@ see https://plugins.jetbrains.com/docs/intellij/plugin-signing.html).
 ```
 
 Copies `marketplace/demo-project` to `/Users/Shared/mail-demo` (so no user path shows up in the
-images), opens it in the sandbox and writes six PNGs to `marketplace/screenshots/` (mail, attachments,
-content tab, dark theme, headers tab, mbox list). The IDE paints its own window for this, no screen recording permission is
+images), opens it in the sandbox and writes seven PNGs to `marketplace/screenshots/` (mail, attachments,
+content tab, dark theme, headers tab, mbox list, text tab). The IDE paints its own window for this, no screen recording permission is
 needed. The helper lives in `src/screenshot/` and is only compiled with `-Pscreenshots`, never into a
 release. Close any running sandbox first, and close the sandbox afterwards.
 
@@ -175,6 +181,9 @@ If the sandbox asks on the first run, confirm "Trust Project" once and run the c
 | `MailViewSettings.kt` | Settings shared by all projects (dark display) |
 | `MailContentEditor.kt` | *Content* tab (read-only editor, HTML/Text switch) |
 | `MailHeaderEditor.kt` | *Headers* tab (read-only editor) |
+| `MailLint.kt` | Format warnings for the *Headers* tab |
+| `MailTextStructure.kt` | *Text* tab: header names, folding of MIME parts and encoded header values |
+| `MailCompare.kt` | *Compare Mails*: normalized text of a mail, diff viewer |
 | `MailEditMode.kt` | Read-only by default, edit mode per file, bar above the *Text* tab |
 | `MailEditorProviders.kt` | Registers the tabs before the regular editor |
 | `MailViewBundle.kt` | UI texts (English, German) in `resources/messages/` |

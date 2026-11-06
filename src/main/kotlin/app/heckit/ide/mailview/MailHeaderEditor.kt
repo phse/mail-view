@@ -1,6 +1,7 @@
 package app.heckit.ide.mailview
 
 import com.intellij.DynamicBundle
+import com.intellij.icons.AllIcons
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.application.runWriteAction
 import com.intellij.openapi.editor.DefaultLanguageHighlighterColors
@@ -80,7 +81,7 @@ class MailHeaderEditor(project: Project, private val file: VirtualFile) : UserDa
                 document.setReadOnly(true)
             }
             highlightNames()
-            showSummary(result.getOrNull()?.let(HeaderAnalysis::of))
+            showSummary(result.getOrNull()?.let(HeaderAnalysis::of), result.getOrNull()?.warnings.orEmpty())
         }
     }
 
@@ -94,9 +95,16 @@ class MailHeaderEditor(project: Project, private val file: VirtualFile) : UserDa
         }
     }
 
-    private fun showSummary(analysis: HeaderAnalysis?) {
+    private fun showSummary(analysis: HeaderAnalysis?, warnings: List<MailWarning>) {
         summary.removeAll()
-        summary.isVisible = analysis != null
+        summary.isVisible = analysis != null || warnings.isNotEmpty()
+        for (warning in warnings) {
+            summary.add(JBLabel(warning.message, AllIcons.General.Warning, SwingConstants.LEFT).apply {
+                alignmentX = 0f
+                border = JBUI.Borders.emptyBottom(3)
+            })
+        }
+        if (analysis != null && warnings.isNotEmpty()) summary.add(javax.swing.Box.createVerticalStrut(JBUI.scale(6)))
         if (analysis != null) {
             if (analysis.auth.isNotEmpty()) {
                 val row = BadgeRow().apply { alignmentX = 0f; isOpaque = false }

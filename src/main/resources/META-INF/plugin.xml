@@ -15,9 +15,11 @@
   <li><b>Mail</b> (default): subject, from, to, CC, BCC, reply-to and date, followed by the rendered message.
       Embedded images are shown, remote content is blocked until you allow it. Attachments can be opened or saved.</li>
   <li><b>Content</b>: the decoded HTML or plain text part, with syntax highlighting.</li>
-  <li><b>Headers</b>: SPF/DKIM/DMARC results and the delivery path with the delay of each hop, followed by all header lines.</li>
-  <li><b>Text</b>: the raw file, read-only by default so a mail can't be changed by accident. <i>Edit</i> in the bar above unlocks it; changes show up in the other views right away. (not for .msg/.oft, they are a binary format.)</li>
+  <li><b>Headers</b>: format warnings (missing Date/Message-ID, unterminated MIME boundary, charset mismatch), SPF/DKIM/DMARC results and the delivery path with the delay of each hop, followed by all header lines.</li>
+  <li><b>Text</b>: the raw file with highlighted header names, foldable MIME parts and encoded header values shown readable when folded, read-only by default so a mail can't be changed by accident. <i>Edit</i> in the bar above unlocks it; changes show up in the other views right away. (not for .msg/.oft, they are a binary format.)</li>
 </ul>
+
+<p><b>Compare Mails</b>: select two mails in the project tree to see them decoded in the diff viewer - transfer encoding, MIME boundaries and header order don't show up as differences.</p>
 
 <p><b>macOS:</b> drag mails from Apple Mail onto a folder in the project tree to save them as .eml (after a one-time permission in the settings).</p>
 
@@ -63,6 +65,8 @@
         <applicationConfigurable parentId="tools" id="app.heckit.ide.mailview" instance="app.heckit.ide.mailview.MailViewConfigurable"
                                  key="settings.title" bundle="messages.MailViewBundle"/>
         <editorFactoryListener implementation="app.heckit.ide.mailview.MboxSeparators"/>
+        <lang.foldingBuilder language="TEXT" implementationClass="app.heckit.ide.mailview.MailFoldingBuilder"/>
+        <annotator language="TEXT" implementationClass="app.heckit.ide.mailview.MailTextAnnotator"/>
         <editorFactoryListener implementation="app.heckit.ide.mailview.MailTextContextMenu"/>
         <postStartupActivity implementation="app.heckit.ide.mailview.ScreenshotStarter"/>
         <postStartupActivity implementation="app.heckit.ide.mailview.MailDropInstaller$Startup"/>
@@ -75,6 +79,9 @@
         <group id="MailView.EditorPopup" class="app.heckit.ide.mailview.MailEditorPopupGroup"/>
         <action id="MailView.OpenFromClipboard" class="app.heckit.ide.mailview.OpenMailFromClipboardAction">
             <add-to-group group-id="FileOpenGroup" anchor="last"/>
+        </action>
+        <action id="MailView.CompareMails" class="app.heckit.ide.mailview.CompareMailsAction" icon="AllIcons.Actions.Diff">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="after" relative-to-action="CompareTwoFiles"/>
         </action>
         <action id="MailView.ShowInMailView" class="app.heckit.ide.mailview.ShowInMailViewAction" icon="/icons/eml.svg">
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>

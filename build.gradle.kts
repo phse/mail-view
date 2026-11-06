@@ -66,6 +66,16 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>1.0.0</h3>
+            <p>First stable release.</p>
+            <ul>
+              <li><b>Compare Mails</b>: select two mails in the project tree and compare them decoded in the diff viewer -
+                  transfer encoding, charsets, MIME boundaries and header order don't show up as differences.</li>
+              <li><b>Format warnings</b> in the <i>Headers</i> tab: missing Date/Message-ID/From, unparseable date,
+                  unterminated MIME boundary, unknown or mismatching charset, unencoded non-ASCII headers.</li>
+              <li><b>Text</b> tab: highlighted header names, foldable MIME parts (base64 folded by default) and
+                  RFC 2047 encoded header values shown readable when folded.</li>
+            </ul>
             <h3>0.8.0</h3>
             <ul>
               <li><b>Drag mails from Apple Mail</b> (macOS) onto a folder in the project tree to save them as .eml. Mail View

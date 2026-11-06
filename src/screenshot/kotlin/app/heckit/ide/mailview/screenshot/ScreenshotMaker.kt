@@ -26,6 +26,8 @@ object ScreenshotMaker {
     private const val SCALE = 2.0
     private const val MAIL = "summer-meetup.eml"
     private const val MBOX = "riverside-makers.mbox"
+    /** Reiter „Text“: kodierter Betreff und base64-Anhänge, eingeklappt. */
+    private const val TEXT_MAIL = "workshop-files.eml"
     private val log = logger<ScreenshotMaker>()
 
     @JvmStatic
@@ -77,6 +79,16 @@ object ScreenshotMaker {
         edt { FileEditorManager.getInstance(project).setSelectedEditor(file, "mail-view-headers") }
         Thread.sleep(2500)
         shot(frame, File(out, "05-headers.png"))
+
+        // Reiter „Text“: Quelltext mit eingefärbten Header-Namen und eingeklappten Teilen.
+        val textMail = edt { project.guessProjectDir()?.findChild(TEXT_MAIL) ?: error("$TEXT_MAIL missing") }
+        edt { FileEditorManager.getInstance(project).openFile(textMail, true) }
+        Thread.sleep(2500)
+        // Erst nach dem Öffnen umschalten: MailTabSelector setzt beim Öffnen den Start-Reiter.
+        edt { FileEditorManager.getInstance(project).setSelectedEditor(textMail, "text-editor") }
+        Thread.sleep(4000)
+        shot(frame, File(out, "07-text.png"))
+        edt { FileEditorManager.getInstance(project).closeFile(textMail) }
 
         // mbox: Liste mit Vorschau der zweiten Mail.
         val mbox = edt { project.guessProjectDir()?.findChild(MBOX) ?: error("$MBOX missing") }
