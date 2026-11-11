@@ -17,6 +17,7 @@ version = providers.gradleProperty("pluginVersion").get()
 
 kotlin {
     jvmToolchain(25)
+    compilerOptions { jvmDefault.set(org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode.NO_COMPATIBILITY) }
 }
 
 // ./gradlew runIde -Pscreenshots=<ordner> baut den Screenshot-Helfer mit ein (nie für Releases verwenden).
@@ -66,6 +67,12 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>1.1.0</h3>
+            <ul>
+              <li><b>Mailpit</b> tool window: lists the mails in Mailpit test servers (one tab per instance), refreshes
+                  automatically and opens them in Mail View. DDEV projects are detected; Basic Auth and sign-in through a
+                  single sign-on proxy in an embedded browser are supported.</li>
+            </ul>
             <h3>1.0.0</h3>
             <p>First stable release.</p>
             <ul>
@@ -249,6 +256,8 @@ tasks.runIde {
         providers.gradleProperty("openProject").orNull?.let { args(it) }
         // ./gradlew runIde -PjcefDebugPort=9333 öffnet die DevTools-Schnittstelle der eingebetteten Browser.
         providers.gradleProperty("jcefDebugPort").orNull?.let { jvmArgs("-Dide.browser.jcef.debug.port=$it") }
+        // ./gradlew runIde -PmailpitSlow=2500 verzögert jede Mailpit-Anfrage (Ladeanzeigen testen).
+        providers.gradleProperty("mailpitSlow").orNull?.let { jvmArgs("-Dmailview.mailpit.slowMs=$it") }
     }
 }
 

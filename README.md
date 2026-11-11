@@ -35,6 +35,20 @@ Outlook `.msg`/`.oft`, Apple Mail `.emlx` and `.mht`/`.mhtml` files the way a ma
 unfolded, decoded and sorted by name; text, HTML and attachments (size and SHA-256) follow. Transfer encoding,
 charsets, MIME boundaries and header order don't show up as differences.
 
+**Mailpit** (tool window on the right): lists the mails in [Mailpit](https://mailpit.axllent.org/) test mail servers,
+one tab per instance (tabs that don't fit go behind the IDE's overflow arrow). The visible tab refreshes every few
+seconds, the others every minute; unread mails are bold and counted in the tab title, the sum in the tool window
+title. Click opens a mail in Mail View (preview tab), double-click or Enter keeps it open. Context menu: save as
+`.eml`, open in the Mailpit web UI, delete (also `Delete`); the toolbar deletes all mails.
+
+- **Instances**: `+` in the tool window header adds one (name, address, *Show in all projects*), the gear edits it.
+  A DDEV project (`.ddev/config.yaml`) gets its tab automatically (`http://<name>.<project_tld>:<mailpit_http_port>`);
+  without any instance the tab shows `http://localhost:8025`.
+- **Login**: Basic Auth (Mailpit `--ui-auth` or a proxy) is stored in the IDE password safe. Behind single sign-on
+  (OIDC proxy, e.g. Traefik), *Sign in in browser…* opens the login in an embedded browser and takes over the
+  session cookie (until it expires or the IDE restarts). Passkeys work via QR code on the phone; passkeys of the Mac
+  itself are not offered in the embedded browser.
+
 Mails attached to a `.msg` are converted to `.eml` and open in Mail View again.
 
 **winmail.dat** (Outlook TNEF): other mail clients only show this one file. Mail View lists the files inside
@@ -152,12 +166,15 @@ see https://plugins.jetbrains.com/docs/intellij/plugin-signing.html).
 ## Regenerating the screenshots
 
 ```
+marketplace/mailpit-demo/start.sh
 ./gradlew runIde -Pscreenshots=marketplace/screenshots
 ```
 
 Copies `marketplace/demo-project` to `/Users/Shared/mail-demo` (so no user path shows up in the
-images), opens it in the sandbox and writes seven PNGs to `marketplace/screenshots/` (mail, attachments,
-content tab, dark theme, headers tab, mbox list, text tab). The IDE paints its own window for this, no screen recording permission is
+images), opens it in the sandbox and writes eight PNGs to `marketplace/screenshots/` (mail, attachments,
+content tab, dark theme, headers tab, mbox list, text tab, Mailpit). For the Mailpit image, start the demo container first
+with `marketplace/mailpit-demo/start.sh` (Docker, web UI on port 18030, neutral demo mails); without it that image is
+skipped. The IDE paints its own window for this, no screen recording permission is
 needed. The helper lives in `src/screenshot/` and is only compiled with `-Pscreenshots`, never into a
 release. Close any running sandbox first, and close the sandbox afterwards.
 
@@ -184,6 +201,11 @@ If the sandbox asks on the first run, confirm "Trust Project" once and run the c
 | `MailLint.kt` | Format warnings for the *Headers* tab |
 | `MailTextStructure.kt` | *Text* tab: header names, folding of MIME parts and encoded header values |
 | `MailCompare.kt` | *Compare Mails*: normalized text of a mail, diff viewer |
+| `Mailpit.kt` | Mailpit REST client, instances (global/project, DDEV detection), credentials |
+| `HkLoading.kt` | heck\\it loading animations (envelope, backslash, dots, rings), self-contained for reuse in other plugins |
+| `MailpitDialog.kt` | Add/edit an instance (name, address, scope, Basic Auth) |
+| `MailpitLogin.kt` | Sign-in in the embedded browser, session cookies |
+| `MailpitToolWindow.kt` | *Mailpit* tool window: list, polling, open/delete/save |
 | `MailEditMode.kt` | Read-only by default, edit mode per file, bar above the *Text* tab |
 | `MailEditorProviders.kt` | Registers the tabs before the regular editor |
 | `MailViewBundle.kt` | UI texts (English, German) in `resources/messages/` |

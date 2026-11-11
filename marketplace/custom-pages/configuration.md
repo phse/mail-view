@@ -46,6 +46,23 @@ Archives and executables are always only revealed. Running them is possible from
 
 When allowed, mails dragged from Apple Mail onto a folder in the project view are saved there as `.eml`. Mail View reads them from Mail via JavaScript for Automation, because Apple Mail only hands out a file promise that Java can't take. Mail View never asks for the permission on its own. Once it is denied, it can only be changed in System Settings (*Privacy & Security | Automation | <IDE> | Mail*); the button then opens them.
 
+## Mailpit
+
+Tool window **Mailpit** (right side): one tab per [Mailpit](https://mailpit.axllent.org/) instance. `+` in the header adds one, the gear edits it, `−` removes it (the mails stay in Mailpit).
+
+| Field | Values | Default |
+| --- | --- | --- |
+| Name | tab title | host name |
+| Address | web UI of Mailpit, `http://` or `https://` | – |
+| Show in all projects | on: stored IDE-wide / off: stored in the project | off |
+| User, Password | Basic Auth (Mailpit `--ui-auth` or a proxy); stored in the IDE password safe, per address | empty (no login) |
+
+- DDEV projects get a tab automatically: `http://<name>.<project_tld>:<mailpit_http_port>` from `.ddev/config.yaml` (defaults `ddev.site`, `8025`). Without any instance the tab shows `http://localhost:8025`.
+- Single sign-on proxy (OIDC, e.g. Traefik) in front of Mailpit: *Sign in in browser…* opens the login in an embedded browser and keeps the session cookie (survives an IDE restart while the proxy accepts it). Passkeys work via QR code on the phone.
+- The visible tab refreshes every 3 s, the others every minute. Unread mails count in the tab title, the sum in the tool window title.
+- Search uses Mailpit's full-text search (subject, addresses, text; also `from:`, `subject:` …).
+- Click opens a mail in a preview tab, double-click or Enter keeps it open and marks it read. Context menu: save as `.eml`, open in the web UI, mark as read/unread, delete.
+
 ## Behaviour that isn't configurable
 
 - The mail file is never written. Only the *Text* tab can change an `.eml`, after *Edit* (until the IDE restarts).

@@ -4,6 +4,13 @@ import com.intellij.ide.util.PropertiesComponent
 import app.heckit.ide.mailview.MailPreviewEditor
 import app.heckit.ide.mailview.MailViewSettings
 import app.heckit.ide.mailview.MboxEditor
+import app.heckit.ide.mailview.MailpitClient
+import app.heckit.ide.mailview.MailpitInstance
+import app.heckit.ide.mailview.MailpitInstances
+import app.heckit.ide.mailview.MailpitPanel
+import app.heckit.ide.mailview.MailpitTabs
+import com.intellij.openapi.wm.ToolWindowAnchor
+import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ide.ui.LafManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
@@ -102,6 +109,8 @@ object ScreenshotMaker {
         shot(frame, File(out, "06-mbox.png"))
         edt { FileEditorManager.getInstance(project).closeFile(mbox) }
 
+        mailpit(project, frame, out)
+
         // Dunkles Theme und dunkle Mail; danach alles wiederherstellen.
         edt {
             theme(laf, dark = true)
@@ -118,6 +127,49 @@ object ScreenshotMaker {
             MailViewSettings.dark = previousDark
         }
         log.warn("Mail View: screenshots written to $out")
+    }
+
+    /**
+     * Tool Window „Mailpit“ mit den Demo-Mails aus `marketplace/mailpit-demo/start.sh` (Port 18030), eine Mail geöffnet.
+     * Eigene Instanzen der Sandbox (global, evtl. mit echten Adressen) werden dafür ausgeblendet und danach zurückgelegt.
+     */
+    private fun mailpit(project: Project, frame: JFrame, out: File) {
+        val url = System.getProperty("mailview.screenshots.mailpit", "http://localhost:18030")
+        if (runCatching { MailpitClient(url).list(1) }.isFailure) {
+            log.warn("Mail View: Mailpit demo not reachable at $url - run marketplace/mailpit-demo/start.sh; skipping 08-mailpit.png")
+            return
+        }
+        val key = "app.heckit.ide.mailview.mailpitInstances"
+        val app = PropertiesComponent.getInstance()
+        val proj = PropertiesComponent.getInstance(project)
+        val savedApp = app.getValue(key)
+        val savedProj = proj.getValue(key)
+        val toolWindow = edt {
+            app.unsetValue(key)
+            proj.unsetValue(key)
+            MailpitInstances.save(project, MailpitInstance("screenshot", "Riverside Makers", url))
+            val tw = ToolWindowManager.getInstance(project).getToolWindow("Mailpit") ?: error("no Mailpit tool window")
+            tw.setAnchor(ToolWindowAnchor.RIGHT, null)
+            tw.show()
+            tw
+        }
+        Thread.sleep(1000)
+        val panel = edt {
+            // Inhalt neu aufbauen, falls das Tool Window schon mit anderen Instanzen offen war.
+            MailpitTabs(project, toolWindow).rebuild("screenshot")
+            toolWindow.contentManager.selectedContent?.getUserData(MailpitPanel.KEY) ?: error("no Mailpit panel")
+        }
+        var opened = false
+        repeat(20) { if (!opened) { Thread.sleep(500); opened = edt { panel.selectAndOpen(2) } } }
+        Thread.sleep(5000)
+        shot(frame, File(out, "08-mailpit.png"))
+        edt {
+            toolWindow.hide()
+            FileEditorManager.getInstance(project).allEditors.map { it.file }.filter { it.path.contains("mail-view") && it.path != project.guessProjectDir()?.path }
+                .forEach { FileEditorManager.getInstance(project).closeFile(it) }
+            if (savedApp != null) app.setValue(key, savedApp) else app.unsetValue(key)
+            if (savedProj != null) proj.setValue(key, savedProj) else proj.unsetValue(key)
+        }
     }
 
     private fun theme(laf: LafManager, dark: Boolean) {

@@ -21,6 +21,8 @@
 
 <p><b>Compare Mails</b>: select two mails in the project tree to see them decoded in the diff viewer - transfer encoding, MIME boundaries and header order don't show up as differences.</p>
 
+<p><b>Mailpit</b>: the Mailpit tool window lists the mails your application sent to a local <a href="https://mailpit.axllent.org/">Mailpit</a> test server (detected automatically in DDEV projects) and opens them in Mail View with one click.</p>
+
 <p><b>macOS:</b> drag mails from Apple Mail onto a folder in the project tree to save them as .eml (after a one-time permission in the settings).</p>
 
 <p>Links in a message open in your system browser. Scripts never run.</p>
@@ -72,6 +74,8 @@
         <postStartupActivity implementation="app.heckit.ide.mailview.MailDropInstaller$Startup"/>
         <editorNotificationProvider implementation="app.heckit.ide.mailview.MailEditModeNotificationProvider"/>
         <editorNotificationProvider implementation="app.heckit.ide.mailview.MailSourceNotificationProvider"/>
+        <toolWindow id="Mailpit" anchor="right" secondary="false" icon="app.heckit.ide.mailview.MailpitIcons.TOOL_WINDOW"
+                    factoryClass="app.heckit.ide.mailview.MailpitToolWindowFactory"/>
         <editorFactoryDocumentListener implementation="app.heckit.ide.mailview.MailSourceDocumentListener"/>
     </extensions>
     <actions>
