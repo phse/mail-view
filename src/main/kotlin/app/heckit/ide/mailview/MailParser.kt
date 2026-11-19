@@ -60,7 +60,7 @@ object MailParser {
         val collector = Collector()
         collector.walk(message)
         return ParsedMail(
-            subject = message.getHeader("Subject", null)?.let(::decode),
+            subject = message.getHeader("Subject", null)?.let(::rawUtf8)?.let(::decode),
             from = addresses(message, "From"),
             to = addresses(message, "To"),
             cc = addresses(message, "Cc"),
@@ -71,7 +71,7 @@ object MailParser {
             text = collector.text,
             inlineParts = collector.inline,
             attachments = collector.attachments,
-            headers = message.allHeaderLines.toList().joinToString("\n").takeIf { it.isNotBlank() },
+            headers = message.allHeaderLines.toList().joinToString("\n") { rawUtf8(it) }.takeIf { it.isNotBlank() },
             locationParts = collector.locations,
             warnings = MailLint.check(message),
         )
@@ -95,7 +95,7 @@ object MailParser {
     }
 
     private fun addresses(message: Message, header: String): List<MailAddress> {
-        val raw = message.getHeader(header)?.joinToString(", ") ?: return emptyList()
+        val raw = message.getHeader(header)?.joinToString(", ")?.let(::rawUtf8) ?: return emptyList()
         return try {
             InternetAddress.parseHeader(raw, false).map(::toMailAddress)
         } catch (_: Exception) {
@@ -109,6 +109,18 @@ object MailParser {
 
     private fun decode(value: String): String =
         runCatching { MimeUtility.decodeText(MimeUtility.unfold(value)) }.getOrDefault(value)
+
+    /**
+     * Unkodierte Nicht-ASCII-Zeichen im Header (RFC 6532, viele Mailer schreiben so) liest Jakarta Mail Byte für Byte als
+     * Latin-1 ("GrÃ¼Ã\u009Fe"). Ergeben die Bytes gültiges UTF-8, gilt das, sonst bleibt es bei Latin-1. `mail.mime.allowutf8`
+     * würde Latin-1-Header dagegen zu Ersatzzeichen machen.
+     */
+    internal fun rawUtf8(value: String): String {
+        if (value.none { it.code > 127 } || value.any { it.code > 255 }) return value
+        return runCatching {
+            Charsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(value.toByteArray(Charsets.ISO_8859_1))).toString()
+        }.getOrDefault(value)
+    }
 
     private class Collector {
         var html: String? = null
@@ -144,7 +156,7 @@ object MailParser {
         private fun addAttachment(part: MimePart) {
             val data = part.inputStream.use { it.readBytes() }
             val mimeType = runCatching { ContentType(part.contentType).baseType.lowercase() }.getOrDefault("application/octet-stream")
-            val name = runCatching { part.fileName }.getOrNull()?.let(::decode)
+            val name = runCatching { part.fileName }.getOrNull()?.let(::rawUtf8)?.let(::decode)
                 ?: if (mimeType == "message/rfc822") embeddedName(data) else MailViewBundle.message("attachment.unnamed")
             // winmail.dat: statt der einen Datei die Anhänge darin zeigen; ist sie kaputt, bleibt sie als Anhang stehen.
             if (TnefParser.isTnef(data)) runCatching { TnefParser.parse(data) }.getOrNull()?.let { tnef ->
@@ -168,7 +180,7 @@ object MailParser {
 
         /** Angehängte Mails haben meist keinen Dateinamen; dann den Betreff nehmen, damit mehrere unterscheidbar sind. */
         private fun embeddedName(data: ByteArray): String {
-            val subject = runCatching { MimeMessage(null, ByteArrayInputStream(data)).subject }.getOrNull()
+            val subject = runCatching { MimeMessage(null, ByteArrayInputStream(data)).subject }.getOrNull()?.let(::rawUtf8)
                 ?.replace(Regex("[\\p{Cntrl}/\\\\:*?\"<>|]"), " ")?.trim()?.take(80)
             return "${subject?.takeIf { it.isNotEmpty() } ?: "message"}.eml"
         }

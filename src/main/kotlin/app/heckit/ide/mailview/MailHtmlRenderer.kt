@@ -17,6 +17,7 @@ object MailHtmlRenderer {
     // Das iframe bekommt die Höhe seines Inhalts; die Seitenhöhe geht über reportHeight(h, top) an Swing (top: Beginn des Mailtexts, dort setzt Swing „Nur Text“/„Dunkel“ an), das scrollt.
     private const val FIT_SCRIPT = """
         const f = document.querySelector('iframe');
+        const narrow = document.querySelector('.content').classList.contains('narrow');
         let loaded = false;
         function fit() {
           const d = f.contentDocument;
@@ -24,7 +25,13 @@ object MailHtmlRenderer {
           // Das iframe scrollt nicht seitlich: Zu breite Bilder (Outlook gibt width/height fest vor) auf die Breite
           // verkleinern, sonst ist ihr rechter Teil abgeschnitten. Nur diese, damit Abstandshalter ihre Höhe behalten.
           const w = d.documentElement.clientWidth;
-          for (const i of d.images) {
+          if (narrow && d.body) {
+            // Tablet/Handy: Wie Mail-Apps auf dem Handy eine zu breite (nicht responsive) Mail als Ganzes verkleinern,
+            // statt sie rechts abzuschneiden. Natürliche Breite = gemessene / aktuelle Verkleinerung, damit es nicht pendelt.
+            const z = parseFloat(d.body.style.zoom) || 1;
+            const target = Math.min(1, w / (d.documentElement.scrollWidth / z));
+            if (Math.abs(target - z) > 0.01) d.body.style.zoom = target;
+          } else for (const i of d.images) {
             if (i.getBoundingClientRect().right <= w + 1) continue;
             i.style.setProperty('max-width', '100%', 'important');
             i.style.setProperty('height', 'auto', 'important');
@@ -144,8 +151,13 @@ object MailHtmlRenderer {
     fun hasRemoteContent(mail: ParsedMail): Boolean =
         mail.html?.let { html -> REMOTE.findAll(html).any { !it.value.startsWith("href", ignoreCase = true) } } == true
 
-    /** [heightCallback] ist JavaScript, das mit der Seitenhöhe in `h` aufgerufen wird. */
-    fun render(mail: ParsedMail, allowRemote: Boolean, heightCallback: String = "", dark: Boolean = false, plainText: Boolean = false): String {
+    /**
+     * [heightCallback] ist JavaScript, das mit der Seitenhöhe in `h` aufgerufen wird. [width]: Mailtext so breit wie auf
+     * einem Tablet/Handy (CSS-Pixel) mittig auf grauem Grund; das iframe ist dann der Viewport, Media Queries greifen.
+     * Breitere, nicht responsive Mails werden wie in Mail-Apps auf die Breite verkleinert.
+     */
+    fun render(mail: ParsedMail, allowRemote: Boolean, heightCallback: String = "", dark: Boolean = false, plainText: Boolean = false,
+               width: Int? = null): String {
         val bg = ColorUtil.toHtmlColor(UIUtil.getPanelBackground())
         val fg = ColorUtil.toHtmlColor(UIUtil.getLabelForeground())
         val muted = ColorUtil.toHtmlColor(UIUtil.getContextHelpForeground())
@@ -196,15 +208,20 @@ object MailHtmlRenderer {
               .actions svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
               iframe { display: block; border: 0; width: 100%; height: 0; background: #fff; }
               .content { position: relative; }
+              .content.narrow { padding: 18px 12px 28px; background: ${if (dark) "#111214" else "#eef0f3"}; }
+              .content.narrow .frame { width: ${width ?: 0}px; max-width: 100%; margin: 0 auto; border-radius: 8px; overflow: hidden;
+                                       box-shadow: ${if (dark) "0 0 0 1px rgba(255, 255, 255, 0.10)" else "0 0 0 1px rgba(0, 0, 0, 0.10), 0 6px 20px rgba(0, 0, 0, 0.12)"}; }
               @media print {
                 html, header { background: #fff !important; }
                 body, header, th, .addr { color: #000 !important; }
                 iframe { filter: none !important; }
+                .content.narrow { padding: 0; background: none; }
+                .content.narrow .frame { width: auto; box-shadow: none; border-radius: 0; }
               }
               ${if (dark) DARK_FRAME else ""}
             </style></head><body>
             <header><div class="top"><h1>${esc(subject)}</h1>${if (SHOW_COMPOSE) actions() else ""}</div><table>$rows</table></header>
-            <div class="content"><iframe scrolling="no" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" srcdoc="${attr(body(mail, dark, plainText))}"></iframe></div>
+            <div class="content${if (width != null) " narrow" else ""}"><div class="frame"><iframe scrolling="no" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" srcdoc="${attr(body(mail, dark, plainText))}"></iframe></div></div>
             <script>function reportHeight(h, top) { $heightCallback }
 $FIT_SCRIPT
 $ACTION_SCRIPT

@@ -71,6 +71,9 @@ object MailViewSettings {
         if (remoteContent == RemoteContent.BLOCK) remoteContent = RemoteContent.TRUSTED
     }
 
+    /** Breite der Vorschau, zuletzt umgeschaltet; nur bis zum IDE-Neustart, damit später keine Mail unerwartet schmal erscheint. */
+    @Volatile var width: MailWidth = MailWidth.DESKTOP
+
     /** Textfassung statt HTML zeigen, wenn die Mail beide hat. */
     var preferText: Boolean
         get() = PropertiesComponent.getInstance().getBoolean(PREFER_TEXT_KEY, false)

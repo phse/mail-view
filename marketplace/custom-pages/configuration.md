@@ -20,6 +20,8 @@ The associations can be changed under *Settings | Editor | File Types*. Text fil
 | Open mails on tab | Mail / Content / Headers (ignored if the last tab is remembered; mbox files always open on the list) | Mail |
 | Show the plain text version instead of HTML | on / off (only for mails with both, can be switched per mail) | off |
 
+The buttons at the top right of a mail switch HTML / Plain Text, Light / Dark and the width: *Desktop* (full width), *Tablet* (768 px) and *Phone* (375 px). The mail is then the viewport, so media queries of responsive mails apply. The width stays for further mails until the IDE restarts.
+
 **Remote content**
 
 | Option | Values | Default |
@@ -57,11 +59,17 @@ Tool window **Mailpit** (right side): one tab per [Mailpit](https://mailpit.axll
 | Show in all projects | on: stored IDE-wide / off: stored in the project | off |
 | User, Password | Basic Auth (Mailpit `--ui-auth` or a proxy); stored in the IDE password safe, per address | empty (no login) |
 
-- DDEV projects get a tab automatically: `http://<name>.<project_tld>:<mailpit_http_port>` from `.ddev/config.yaml` (defaults `ddev.site`, `8025`). Without any instance the tab shows `http://localhost:8025`.
+- Tabs that appear on their own (not stored, can't be removed; the gear stores them as a regular instance):
+  - DDEV: `http://<name>.<project_tld>:<mailpit_http_port>` from `.ddev/config.yaml` (defaults `ddev.site`, `8025`).
+  - *Compose*: a service with a Mailpit image (`axllent/mailpit`) in `compose.yaml`, `compose.yml`, `docker-compose.yaml` or `docker-compose.yml` in the project folder. The address comes from the published port of the web UI (8025 in the container), variables like `${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}` from the `.env` next to it. While the container runs, its real port is used (also for random ports).
+  - Running Docker containers with a Mailpit image and a published web UI (`docker ps`, checked every 10 s while the tool window is visible, otherwise every minute): containers started with `docker run` or by Testcontainers, and Compose containers of this project. Compose containers of other projects are left out.
+  - An address that is already stored or detected shows up only once. Without any instance the tab shows `http://localhost:8025`.
 - Single sign-on proxy (OIDC, e.g. Traefik) in front of Mailpit: *Sign in in browser…* opens the login in an embedded browser and keeps the session cookie (survives an IDE restart while the proxy accepts it). Passkeys work via QR code on the phone.
 - The visible tab refreshes every 3 s, the others every minute. Unread mails count in the tab title, the sum in the tool window title.
 - Search uses Mailpit's full-text search (subject, addresses, text; also `from:`, `subject:` …).
 - Click opens a mail in a preview tab, double-click or Enter keeps it open and marks it read. Context menu: save as `.eml`, open in the web UI, mark as read/unread, delete.
+- Tags (Mailpit `X-Tags` header, tagging rules) appear next to the sender. The filter button in the toolbar lists all tags of the instance; choose one to show only its mails, or *All mails* to show everything again. A dot on the button shows that a tag filter is active; it combines with the search field.
+- *Release via SMTP…* (context menu) only appears if Mailpit has an SMTP relay configured (`--smtp-relay-config` or `MP_SMTP_RELAY_HOST`). It sends the selected mails to the addresses entered (prefilled with the mail's recipients); the allowed and blocked recipients of the relay configuration are checked before sending.
 
 ## Behaviour that isn't configurable
 

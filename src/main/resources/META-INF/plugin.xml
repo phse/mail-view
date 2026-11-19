@@ -21,7 +21,9 @@
 
 <p><b>Compare Mails</b>: select two mails in the project tree to see them decoded in the diff viewer - transfer encoding, MIME boundaries and header order don't show up as differences.</p>
 
-<p><b>Mailpit</b>: the Mailpit tool window lists the mails your application sent to a local <a href="https://mailpit.axllent.org/">Mailpit</a> test server (detected automatically in DDEV projects) and opens them in Mail View with one click.</p>
+<p><b>Mailpit</b>: the Mailpit tool window lists the mails your application sent to a local <a href="https://mailpit.axllent.org/">Mailpit</a> test server and opens them in Mail View with one click. Mailpit in DDEV, in the project's Docker Compose file (e.g. Laravel Sail) or in a running Docker container (e.g. Testcontainers) is found automatically. Tags are shown and can be filtered; mails can be released to real addresses via Mailpit's SMTP relay.</p>
+
+<p><b>Phone and tablet width</b>: check how a responsive mail looks on a phone (375 px) or tablet (768 px) with one click.</p>
 
 <p><b>macOS:</b> drag mails from Apple Mail onto a folder in the project tree to save them as .eml (after a one-time permission in the settings).</p>
 

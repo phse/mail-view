@@ -186,7 +186,9 @@ class MailPreviewEditor(
     private var plainText = MailViewSettings.preferText
     /** Beginn des Mailtexts in der Seite (unter dem Kopf); bis dorthin wandern „Nur Text“ und „Dunkel“ mit. */
     private var contentTop = 0
-    private val toggles = ViewToggles({ togglePlainText() }, { toggleDark() })
+    /** Breite der Vorschau (Desktop, Tablet, Handy); zuletzt gewählt gilt für weitere Mails bis zum IDE-Neustart. */
+    private var width = MailViewSettings.width
+    private val toggles = ViewToggles({ togglePlainText() }, { toggleDark() }, { toggleWidth() })
     /**
      * „Nur Text“ und „Dunkel“ liegen in Swing über der Mail, nicht in der Seite: So scrollen sie mit, bis sie oben
      * ankommen, und bleiben dann stehen (CSS sticky geht nicht, weil Swing scrollt und nicht die Seite).
@@ -336,7 +338,7 @@ class MailPreviewEditor(
     private fun render(keepScroll: Boolean = false) {
         val parsed = mail ?: return
         if (browser != null) {
-            toggles.update(plainText, parsed.html != null && parsed.text != null, dark)
+            toggles.update(plainText, parsed.html != null && parsed.text != null, dark, width)
             pendingScroll = if (keepScroll) scrollPane.verticalScrollBar.value else -1
             pageHeight = 0
             loading = true
@@ -345,7 +347,7 @@ class MailPreviewEditor(
             val background = if (dark) DARK_BACKGROUND else Color.WHITE
             listOf(browserHost, browser.component, scrollContent, scrollPane.viewport).forEach { it.background = background }
             scrollPane.verticalScrollBar.value = 0
-            browser.loadHTML(MailHtmlRenderer.render(parsed, allowRemote, "console.log('$HEIGHT_PREFIX' + h + ',' + top)", dark, plainText))
+            browser.loadHTML(MailHtmlRenderer.render(parsed, allowRemote, "console.log('$HEIGHT_PREFIX' + h + ',' + top)", dark, plainText, width.pixels))
         }
         else showText(parsed.text ?: StringUtil.stripHtml(parsed.html ?: "", true))
     }
@@ -797,6 +799,14 @@ class MailPreviewEditor(
 
     private fun togglePlainText() {
         plainText = !plainText
+        takeSnapshot()
+        render(keepScroll = true)
+    }
+
+    /** Desktop → Tablet → Handy: Responsive Mails (Media Queries) zeigen so ihre schmale Fassung. */
+    private fun toggleWidth() {
+        width = width.next()
+        MailViewSettings.width = width
         takeSnapshot()
         render(keepScroll = true)
     }

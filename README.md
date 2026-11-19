@@ -19,8 +19,10 @@ Outlook `.msg`/`.oft`, Apple Mail `.emlx` and `.mht`/`.mhtml` files the way a ma
   *Save to Project…*); ⌘-click opens it directly, ⌥-click shows it in the file manager, ⌃-click opens it with the
   system application (Ctrl, Alt, Shift on Windows/Linux). Drag a tile into the project tree, Finder/Explorer or
   another application.
-- **HTML / Plain Text** and **Light / Dark** float at the top right of the message (faded until the mouse
-  comes near) and show the active state. They scroll with the mail until they reach the top, then stay.
+- **HTML / Plain Text**, **Light / Dark** and **Desktop / Tablet / Phone** float at the top right of the message (faded
+  until the mouse comes near) and show the active state. They scroll with the mail until they reach the top, then stay.
+  *Tablet* (768 px) and *Phone* (375 px) show the message centered at that width; the message is the viewport, so media
+  queries of responsive mails apply. The width stays for further mails until the IDE restarts.
 - **Content**: the decoded HTML or plain text part (switch at the top), read-only, highlighted.
 - **Headers**: at the top format warnings (missing Date/Message-ID/From, unparseable date, unterminated MIME boundary, unknown or mismatching charset, unencoded non-ASCII headers; hints only, the file is never changed), then the SPF, DKIM and DMARC badges, the sending software and *List-Unsubscribe* links, and the delivery path (Received chain from sender to recipient) with time and delay per hop; delays over 5 minutes are red. Below, all header lines of the mail, read-only, header names highlighted.
   For `.msg` these are the transport headers Outlook stores for received mails; drafts and sent
@@ -42,8 +44,13 @@ title. Click opens a mail in Mail View (preview tab), double-click or Enter keep
 `.eml`, open in the Mailpit web UI, delete (also `Delete`); the toolbar deletes all mails.
 
 - **Instances**: `+` in the tool window header adds one (name, address, *Show in all projects*), the gear edits it.
-  A DDEV project (`.ddev/config.yaml`) gets its tab automatically (`http://<name>.<project_tld>:<mailpit_http_port>`);
-  without any instance the tab shows `http://localhost:8025`.
+  Found automatically: a DDEV project (`.ddev/config.yaml`, `http://<name>.<project_tld>:<mailpit_http_port>`), a Mailpit
+  service in the project's Compose file (`compose.yaml`, `docker-compose.yml` …, e.g. Laravel Sail; port variables from
+  `.env`) and running Mailpit containers (`docker ps` every 10 s while the tool window is visible: `docker run`,
+  Testcontainers, Compose containers of this project). Without any instance the tab shows `http://localhost:8025`.
+- **Tags** are shown next to the sender; the filter button lists all tags and shows only the mails of the chosen one (a dot on the button marks an active filter).
+- **Release via SMTP…** (context menu, only if Mailpit has an SMTP relay configured) sends mails to real addresses;
+  the relay's allowed/blocked recipients are checked first.
 - **Login**: Basic Auth (Mailpit `--ui-auth` or a proxy) is stored in the IDE password safe. Behind single sign-on
   (OIDC proxy, e.g. Traefik), *Sign in in browser…* opens the login in an embedded browser and takes over the
   session cookie (until it expires or the IDE restarts). Passkeys work via QR code on the phone; passkeys of the Mac
@@ -171,8 +178,8 @@ marketplace/mailpit-demo/start.sh
 ```
 
 Copies `marketplace/demo-project` to `/Users/Shared/mail-demo` (so no user path shows up in the
-images), opens it in the sandbox and writes eight PNGs to `marketplace/screenshots/` (mail, attachments,
-content tab, dark theme, headers tab, mbox list, text tab, Mailpit). For the Mailpit image, start the demo container first
+images), opens it in the sandbox and writes nine PNGs to `marketplace/screenshots/` (mail, attachments,
+content tab, dark theme, headers tab, mbox list, text tab, Mailpit, phone width). For the Mailpit image, start the demo container first
 with `marketplace/mailpit-demo/start.sh` (Docker, web UI on port 18030, neutral demo mails); without it that image is
 skipped. The IDE paints its own window for this, no screen recording permission is
 needed. The helper lives in `src/screenshot/` and is only compiled with `-Pscreenshots`, never into a
@@ -194,14 +201,17 @@ If the sandbox asks on the first run, confirm "Trust Project" once and run the c
 | `AttachmentChip.kt` | Attachment tiles: file type icon, click menu with modifier shortcuts, drag image |
 | `MailSource.kt` | Parses in the background and again after edits (unsaved document or file bytes) |
 | `MailHtmlRenderer.kt` | HTML page of the *Mail* tab: header, message in a sandboxed iframe, CSP, dark display |
-| `MailPreviewEditor.kt` | *Mail* tab (JCEF), scrolling, remote content banner, attachments, *Dark* switch |
+| `MailPreviewEditor.kt` | *Mail* tab (JCEF), scrolling, remote content banner, attachments, *Dark* and width switches |
+| `ViewToggles.kt` | Floating HTML/Text, Light/Dark and Desktop/Tablet/Phone buttons |
 | `MailViewSettings.kt` | Settings shared by all projects (dark display) |
 | `MailContentEditor.kt` | *Content* tab (read-only editor, HTML/Text switch) |
 | `MailHeaderEditor.kt` | *Headers* tab (read-only editor) |
 | `MailLint.kt` | Format warnings for the *Headers* tab |
 | `MailTextStructure.kt` | *Text* tab: header names, folding of MIME parts and encoded header values |
 | `MailCompare.kt` | *Compare Mails*: normalized text of a mail, diff viewer |
-| `Mailpit.kt` | Mailpit REST client, instances (global/project, DDEV detection), credentials |
+| `Mailpit.kt` | Mailpit REST client (list, tags, relay), instances (global/project, detected ones), credentials |
+| `MailpitDiscovery.kt` | Mailpit in the Compose file (minimal YAML reading, `.env` variables) and in running containers (`docker ps`) |
+| `MailpitReleaseDialog.kt` | Recipients for *Release via SMTP…*, checked against the relay's allowed/blocked recipients |
 | `HkLoading.kt` | heck\\it loading animations (envelope, backslash, dots, rings), self-contained for reuse in other plugins |
 | `MailpitDialog.kt` | Add/edit an instance (name, address, scope, Basic Auth) |
 | `MailpitLogin.kt` | Sign-in in the embedded browser, session cookies |
@@ -217,7 +227,9 @@ off-screen buffer small.
 
 `getContent()` of Jakarta Mail is avoided on purpose: it needs Jakarta Activation's mailcap
 registry, which doesn't work reliably in a plugin class loader. Multiparts are read via
-`MimePartDataSource`, text parts as decoded bytes with their charset.
+`MimePartDataSource`, text parts as decoded bytes with their charset. That's also why the plugin
+only bundles `jakarta.mail-api` and `angus-core` (base64/quoted-printable streams) instead of the
+full `angus-mail` with its SMTP/IMAP/POP3 providers, and no mailcap implementation (`angus-activation`).
 
 `.msg` is read without Apache POI: the plugin only needs the OLE2 container and the RTF
 decompression, both openly documented by Microsoft. POI would add about 7 MB for that.

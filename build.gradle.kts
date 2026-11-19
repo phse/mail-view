@@ -42,8 +42,13 @@ configurations.runtimeClasspath {
 }
 
 dependencies {
-    // MIME-Parser (RFC 5322/2045 ff.), wird ins Plugin gepackt.
-    implementation("org.eclipse.angus:angus-mail:2.0.3")
+    // MIME-Parser (RFC 5322/2045 ff.), wird ins Plugin gepackt. Nur angus-core (Streams für base64/quoted-printable,
+    // Inhalts-Handler) statt angus-mail: Dessen SMTP/IMAP/POP3 braucht das Plugin nicht (spart rund 390 KB).
+    implementation("jakarta.mail:jakarta.mail-api:2.1.3")
+    implementation("org.eclipse.angus:angus-core:2.0.3") {
+        // Mailcap-Registrierung (Jakarta Activation): getContent()/writeTo() nutzt das Plugin bewusst nicht.
+        exclude(group = "org.eclipse.angus", module = "angus-activation")
+    }
     // RTF → HTML für Outlook-.msg ohne HTML-Teil (.msg selbst liest der eigene CfbReader).
     implementation("com.github.bbottema:rtf-to-html:1.1.1")
     testImplementation("junit:junit:4.13.2")
@@ -51,6 +56,8 @@ dependencies {
     intellijPlatform {
         if (platformLocalPath != null) {
             local(platformLocalPath)
+            // Ab 2026.3 liegt JNA (AppleMailDrop) in einem eigenen Plugin; zur Laufzeit bekommen Fremd-Plugins es von selbst.
+            if (file("$platformLocalPath/Contents/plugins/jna-plugin").exists()) bundledPlugin("com.intellij.modules.jna")
         } else {
             create(IntelliJPlatformType.PhpStorm, providers.gradleProperty("platformVersion").get())
         }
@@ -67,6 +74,18 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>1.2.0</h3>
+            <ul>
+              <li><b>Phone and tablet width</b>: a new button at the top right of the mail shows it 375 px (phone) or
+                  768 px (tablet) wide, so media queries of responsive mails apply.</li>
+              <li><b>Mailpit</b>: instances in the project's Docker Compose file (e.g. Laravel Sail) and running Mailpit
+                  containers (docker run, Testcontainers) get a tab automatically, with the real port of the container.</li>
+              <li><b>Mailpit</b>: tags are shown in the list and can be filtered; <i>Release via SMTP…</i> sends mails to
+                  real addresses if Mailpit has an SMTP relay configured.</li>
+              <li>Unencoded umlauts and other non-ASCII characters in headers (subject, names, file names) are shown
+                  correctly instead of garbled; the Headers tab still warns about them.</li>
+              <li>Smaller download: only the parts of Jakarta Mail the plugin needs are bundled (about 1 MB instead of 1.4 MB).</li>
+            </ul>
             <h3>1.1.0</h3>
             <ul>
               <li><b>Mailpit</b> tool window: lists the mails in Mailpit test servers (one tab per instance), refreshes

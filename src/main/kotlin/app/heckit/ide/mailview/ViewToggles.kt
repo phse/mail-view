@@ -23,16 +23,20 @@ import javax.swing.SwingUtilities
 import javax.swing.Timer
 
 /**
- * Darstellung der Mail rechts oben über dem Mailtext: HTML/Text und Hell/Dunkel, untereinander und gleich breit.
+ * Darstellung der Mail rechts oben über dem Mailtext: HTML/Text, Hell/Dunkel und die Breite (Desktop, Tablet, Handy),
+ * untereinander und gleich breit.
  * Jeder Knopf zeigt den aktiven Zustand. Beide sind stark verblasst, damit sie die Mail nicht verdecken; fährt die
  * Maus über den Bereich (Knöpfe samt Rand), kommen beide nach vorn. Die Farben folgen der Mail (hell/dunkel), auf
  * der die Knöpfe liegen - in IDE-Farben wirkte ein dunkler Knopf auf heller Mail verblasst nur grau und verwaschen.
  */
-class ViewToggles(plainText: () -> Unit, dark: () -> Unit) : JPanel(null) {
+class ViewToggles(plainText: () -> Unit, dark: () -> Unit, width: () -> Unit) : JPanel(null) {
     private val plainButton = Pill(
         listOf(MailViewBundle.message("preview.html"), MailViewBundle.message("preview.plainText")), listOf(Glyph.HTML, Glyph.TEXT), plainText)
     private val darkButton = Pill(
         listOf(MailViewBundle.message("preview.light"), MailViewBundle.message("preview.dark")), listOf(Glyph.SUN, Glyph.MOON), dark)
+    private val widthButton = Pill(
+        MailWidth.entries.map { MailViewBundle.message(it.key) }, listOf(Glyph.DESKTOP, Glyph.TABLET, Glyph.PHONE), width)
+    private val buttons = listOf(plainButton, darkButton, widthButton)
     private var hover = false
     private var darkMail = false
     /** Austritte gehen gelegentlich verloren (schnelle Bewegung über den Rand); solange aktiv, nachsehen. */
@@ -49,13 +53,12 @@ class ViewToggles(plainText: () -> Unit, dark: () -> Unit) : JPanel(null) {
     init {
         isOpaque = false
         border = JBUI.Borders.empty(PAD)
-        add(plainButton)
-        add(darkButton)
+        buttons.forEach(::add)
         val tracker = object : MouseAdapter() {
             override fun mouseEntered(e: MouseEvent) = updateHover()
             override fun mouseExited(e: MouseEvent) = updateHover()
         }
-        listOf(this, plainButton, darkButton).forEach { it.addMouseListener(tracker) }
+        (listOf(this) + buttons).forEach { it.addMouseListener(tracker) }
     }
 
     /** Ein- und Austritt der Kinder melden auch Wechsel innerhalb des Bereichs; deshalb die Mausposition prüfen. */
@@ -74,21 +77,22 @@ class ViewToggles(plainText: () -> Unit, dark: () -> Unit) : JPanel(null) {
     private fun repaintArea() = parent?.repaint(x, y, width, height) ?: repaint()
 
     /** Zustand übernehmen; [canPlain]: Die Mail hat HTML- und Textfassung. */
-    fun update(plain: Boolean, canPlain: Boolean, dark: Boolean) {
+    fun update(plain: Boolean, canPlain: Boolean, dark: Boolean, width: MailWidth) {
         plainButton.isVisible = canPlain
         plainButton.state = if (plain) 1 else 0
         darkButton.state = if (dark) 1 else 0
+        widthButton.state = width.ordinal
         darkMail = dark
         revalidate()
         repaintArea()
     }
 
-    private val visibleButtons get() = listOf(plainButton, darkButton).filter { it.isVisible }
+    private val visibleButtons get() = buttons.filter { it.isVisible }
     private val gap get() = JBUI.scale(6)
 
     override fun getPreferredSize(): Dimension {
         val buttons = visibleButtons
-        val width = listOf(plainButton, darkButton).maxOf { it.preferredSize.width }
+        val width = buttons.maxOf { it.preferredSize.width }
         val pad = JBUI.scale(PAD) * 2
         return Dimension(width + pad, buttons.sumOf { it.preferredSize.height } + gap * (buttons.size - 1) + pad)
     }
@@ -110,9 +114,9 @@ class ViewToggles(plainText: () -> Unit, dark: () -> Unit) : JPanel(null) {
         g2.dispose()
     }
 
-    private enum class Glyph { HTML, TEXT, SUN, MOON }
+    private enum class Glyph { HTML, TEXT, SUN, MOON, DESKTOP, TABLET, PHONE }
 
-    /** Knopf mit Icon und Text des aktiven Zustands ([state] 0/1); Breite reicht für beide Texte. */
+    /** Knopf mit Icon und Text des aktiven Zustands ([state] 0, 1 …); Breite reicht für alle Texte. */
     private inner class Pill(private val labels: List<String>, private val glyphs: List<Glyph>, onClick: () -> Unit) : JComponent() {
         var state = 0
         private var hover = false
@@ -173,6 +177,19 @@ class ViewToggles(plainText: () -> Unit, dark: () -> Unit) : JPanel(null) {
                     moon.subtract(Area(Ellipse2D.Float(x + s * 0.38f, y - s * 0.2f, s * 0.85f, s * 0.85f)))
                     g2.draw(moon)
                 }
+                Glyph.DESKTOP -> {
+                    // Bildschirm mit Fuß.
+                    g2.draw(java.awt.geom.RoundRectangle2D.Float(x, y + s * 0.12f, s, s * 0.6f, s * 0.12f, s * 0.12f))
+                    g2.draw(Line2D.Float(x + s * 0.5f, y + s * 0.72f, x + s * 0.5f, y + s * 0.88f))
+                    g2.draw(Line2D.Float(x + s * 0.28f, y + s * 0.9f, x + s * 0.72f, y + s * 0.9f))
+                }
+                Glyph.TABLET, Glyph.PHONE -> {
+                    // Hochkant, das Handy schmaler; unten der Home-Strich.
+                    val w = if (glyphs[state] == Glyph.TABLET) s * 0.72f else s * 0.5f
+                    val left = x + (s - w) / 2
+                    g2.draw(java.awt.geom.RoundRectangle2D.Float(left, y + s * 0.04f, w, s * 0.92f, s * 0.16f, s * 0.16f))
+                    g2.draw(Line2D.Float(left + w * 0.38f, y + s * 0.8f, left + w * 0.62f, y + s * 0.8f))
+                }
                 Glyph.SUN -> {
                     val c = s / 2
                     g2.draw(Ellipse2D.Float(x + c - s * 0.2f, y + c - s * 0.2f, s * 0.4f, s * 0.4f))
@@ -194,4 +211,13 @@ class ViewToggles(plainText: () -> Unit, dark: () -> Unit) : JPanel(null) {
         const val FADED = 0.4f
         const val STEP = (1f - FADED) / 9
     }
+}
+
+/** Breite der Mail-Vorschau: ganze Breite oder wie auf einem Tablet bzw. Handy (CSS-Pixel, gängige Gerätebreiten). */
+enum class MailWidth(val key: String, val pixels: Int?) {
+    DESKTOP("preview.width.desktop", null),
+    TABLET("preview.width.tablet", 768),
+    PHONE("preview.width.phone", 375);
+
+    fun next(): MailWidth = entries[(ordinal + 1) % entries.size]
 }

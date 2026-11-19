@@ -3,6 +3,7 @@ package app.heckit.ide.mailview.screenshot
 import com.intellij.ide.util.PropertiesComponent
 import app.heckit.ide.mailview.MailPreviewEditor
 import app.heckit.ide.mailview.MailViewSettings
+import app.heckit.ide.mailview.MailWidth
 import app.heckit.ide.mailview.MboxEditor
 import app.heckit.ide.mailview.MailpitClient
 import app.heckit.ide.mailview.MailpitInstance
@@ -86,6 +87,23 @@ object ScreenshotMaker {
         edt { FileEditorManager.getInstance(project).setSelectedEditor(file, "mail-view-headers") }
         Thread.sleep(2500)
         shot(frame, File(out, "05-headers.png"))
+
+        // Breitenvorschau: dieselbe Mail in Handybreite (Knopf rechts oben zeigt „Handy“).
+        edt {
+            FileEditorManager.getInstance(project).closeFile(file)
+            MailViewSettings.width = MailWidth.PHONE
+        }
+        Thread.sleep(1500)
+        open(project, file)
+        Thread.sleep(6000)
+        shot(frame, File(out, "09-phone.png"))
+        edt {
+            MailViewSettings.width = MailWidth.DESKTOP
+            FileEditorManager.getInstance(project).closeFile(file)
+        }
+        Thread.sleep(1000)
+        open(project, file)
+        Thread.sleep(3000)
 
         // Reiter „Text“: Quelltext mit eingefärbten Header-Namen und eingeklappten Teilen.
         val textMail = edt { project.guessProjectDir()?.findChild(TEXT_MAIL) ?: error("$TEXT_MAIL missing") }

@@ -27,6 +27,20 @@ data class MailpitMessage(
     val attachments: Int,
     val read: Boolean,
     val snippet: String?,
+    /** Schlagwörter (Mailpit `X-Tags`, Regeln oder von Hand), schon von Mailpit sortiert. */
+    val tags: List<String> = emptyList(),
+    /** Adressen aus To, Cc und Bcc - Vorschlag fürs Weiterleiten über SMTP. */
+    val recipients: List<String> = emptyList(),
+)
+
+/** Weiterleiten über einen in Mailpit eingerichteten SMTP-Server (`--smtp-relay-config`, „Release“ in der Weboberfläche). */
+data class MailpitRelay(
+    val smtpServer: String,
+    /** Regex der erlaubten bzw. gesperrten Empfänger, leer: keine Einschränkung. */
+    val allowedRecipients: String,
+    val blockedRecipients: String,
+    /** Absender, den Mailpit beim Weiterleiten einsetzt, leer: unverändert. */
+    val overrideFrom: String,
 )
 
 /** Mailpit (oder ein Proxy davor) verlangt eine Anmeldung bzw. hat sie abgelehnt. */
@@ -64,6 +78,25 @@ class MailpitClient(baseUrl: String, user: String? = null, password: String? = n
 
     fun deleteAll() = send(request("$api/messages", "DELETE", "{}"))
 
+    /** Alle Schlagwörter dieser Instanz. */
+    fun tags(): List<String> = JsonParser.parseString(send(get("$api/tags")).toString(Charsets.UTF_8)).let { json ->
+        if (json.isJsonArray) json.asJsonArray.mapNotNull { it.takeIf { e -> e.isJsonPrimitive }?.asString } else emptyList()
+    }
+
+    /** Weiterleiten über SMTP, falls in Mailpit eingerichtet; sonst null (auch bei älteren Mailpit-Versionen ohne diese Angabe). */
+    fun relay(): MailpitRelay? {
+        val json = JsonParser.parseString(send(get("$api/webui")).toString(Charsets.UTF_8)).asJsonObject
+        val relay = json.get("MessageRelay")?.takeIf { it.isJsonObject }?.asJsonObject ?: return null
+        if (relay.get("Enabled")?.takeIf { it.isJsonPrimitive }?.asBoolean != true) return null
+        // Ältere Mailpit-Versionen nennen die Erlaubnisliste „RecipientAllowlist“.
+        return MailpitRelay(relay.str("SMTPServer").orEmpty(), relay.str("AllowedRecipients")?.ifEmpty { null } ?: relay.str("RecipientAllowlist").orEmpty(),
+            relay.str("BlockedRecipients").orEmpty(), relay.str("OverrideFrom").orEmpty())
+    }
+
+    /** Mail über den SMTP-Server aus [relay] an [to] schicken. */
+    fun release(id: String, to: List<String>) =
+        send(request("$api/message/${encode(id)}/release", "POST", """{"To":${to.toJson()}}"""))
+
     /** Weboberfläche zu einer Mail. */
     fun webUrl(id: String) = "$baseUrl/view/${encode(id)}"
 
@@ -82,7 +115,11 @@ class MailpitClient(baseUrl: String, user: String? = null, password: String? = n
         val response = HTTP.send(request, HttpResponse.BodyHandlers.ofByteArray())
         if (response.statusCode() == 401 || response.statusCode() == 403)
             throw MailpitAuthException(response.statusCode(), authorization != null || cookie != null)
-        if (response.statusCode() !in 200..299) throw java.io.IOException("HTTP ${response.statusCode()} ${request.uri()}")
+        if (response.statusCode() !in 200..299) {
+            // Mailpit erklärt Fehler (z. B. beim Weiterleiten: Empfänger nicht erlaubt) als Text im Rumpf.
+            val detail = response.body().toString(Charsets.UTF_8).trim().take(300).takeIf { it.isNotEmpty() && !it.startsWith("<") }
+            throw java.io.IOException(detail ?: "HTTP ${response.statusCode()} ${request.uri()}")
+        }
         return response.body()
     }
 
@@ -96,6 +133,12 @@ class MailpitClient(baseUrl: String, user: String? = null, password: String? = n
         attachments = o.get("Attachments")?.takeIf { it.isJsonPrimitive }?.asInt ?: 0,
         read = o.get("Read")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false,
         snippet = o.str("Snippet"),
+        tags = o.get("Tags")?.takeIf { it.isJsonArray }?.asJsonArray?.mapNotNull { it.takeIf { e -> e.isJsonPrimitive }?.asString }.orEmpty(),
+        recipients = listOf("To", "Cc", "Bcc").flatMap { key ->
+            o.get(key)?.takeIf { it.isJsonArray }?.asJsonArray?.mapNotNull { e ->
+                e.takeIf { it.isJsonObject }?.asJsonObject?.str("Address")?.takeIf { it.isNotBlank() }
+            }.orEmpty()
+        }.distinct(),
     )
 
     private fun address(o: JsonObject): String? {
@@ -140,7 +183,7 @@ object MailpitInstances {
     private fun write(props: PropertiesComponent, list: List<MailpitInstance>) =
         props.setValue(KEY, gson.toJson(list.map { Stored(it.id, it.name, it.url) }), "[]")
 
-    fun all(project: Project): List<MailpitInstance> {
+    fun all(project: Project, containers: List<MailpitDiscovery.Container> = emptyList()): List<MailpitInstance> {
         val projectProps = PropertiesComponent.getInstance(project)
         // Adresse aus der ersten Fassung (eine je Projekt) übernehmen.
         projectProps.getValue(OLD_URL_KEY)?.takeIf { it.isNotBlank() }?.let { old ->
@@ -148,14 +191,51 @@ object MailpitInstances {
             projectProps.unsetValue(OLD_URL_KEY)
         }
         val stored = read(PropertiesComponent.getInstance(), true) + read(projectProps, false)
-        val ddev = MailpitSettings.detectDdev(project)
-        val auto = when {
-            ddev != null && stored.none { it.url == ddev } -> MailpitInstance("auto", "DDEV", ddev, auto = true)
-            stored.isEmpty() -> MailpitInstance("auto", "localhost", MailpitSettings.DEFAULT_URL, auto = true)
-            else -> null
-        }
-        return listOfNotNull(auto) + stored
+        val auto = detected(project, containers)
+        val seen = stored.map { normalize(it.url) }.toMutableSet()
+        val fresh = auto.filter { seen.add(normalize(it.url)) }
+        val fallback = if (stored.isEmpty() && fresh.isEmpty())
+            listOf(MailpitInstance("auto", "localhost", MailpitSettings.DEFAULT_URL, auto = true)) else emptyList()
+        return fallback + fresh + stored
     }
+
+    /**
+     * Erkannte Instanzen: DDEV, Mailpit-Dienste der Compose-Datei (mit dem echten Port, wenn der Container läuft) und
+     * laufende Mailpit-Container ohne Compose-Projekt oder mit einem in diesem Projekt (`docker run`, Testcontainers).
+     */
+    private fun detected(project: Project, containers: List<MailpitDiscovery.Container>): List<MailpitInstance> {
+        val result = mutableListOf<MailpitInstance>()
+        MailpitSettings.detectDdev(project)?.let { result += MailpitInstance("auto", "DDEV", it, auto = true) }
+        val base = project.basePath?.let { java.io.File(it).canonicalPath }
+        fun inProject(dir: String) = base != null && dir.isNotEmpty() &&
+            runCatching { java.io.File(dir).canonicalPath }.getOrDefault(dir).let { it == base || it.startsWith(base + java.io.File.separator) }
+        val used = mutableSetOf<MailpitDiscovery.Container>()
+        MailpitDiscovery.compose(project)?.let { (file, services) ->
+            val dir = file.parent.path
+            for (service in services) {
+                val running = containers.firstOrNull { it.composeService == service.name && inProject(it.composeDir) &&
+                    runCatching { java.io.File(it.composeDir).canonicalPath == java.io.File(dir).canonicalPath }.getOrDefault(false) }
+                running?.let { used += it }
+                val url = running?.url ?: service.url ?: continue
+                val name = if (services.size == 1) "Compose" else "Compose: ${service.name}"
+                result += MailpitInstance("auto:compose:${service.name}", name, url, auto = true)
+            }
+        }
+        for (container in containers) {
+            if (container in used || (container.composeDir.isNotEmpty() && !inProject(container.composeDir))) continue
+            val name = when {
+                container.testcontainers -> "Testcontainers"
+                container.composeService.isNotEmpty() -> container.composeService
+                else -> container.name
+            }
+            result += MailpitInstance("auto:docker:${container.name}", name, container.url, auto = true)
+        }
+        return result
+    }
+
+    /** Gleiche Instanz trotz anderer Schreibweise (127.0.0.1/localhost, Schrägstrich am Ende). */
+    private fun normalize(url: String): String = url.trim().trimEnd('/').lowercase()
+        .replace("://127.0.0.1", "://localhost").replace("://[::1]", "://localhost")
 
     /** Neu anlegen oder ändern (gleiche [MailpitInstance.id]); ein Wechsel global ↔ Projekt verschiebt sie. */
     fun save(project: Project, instance: MailpitInstance) {
