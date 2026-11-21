@@ -113,6 +113,20 @@ object ClipboardMail {
 class MailSourceNotificationProvider : EditorNotificationProvider, DumbAware {
     override fun collectNotificationData(project: Project, file: VirtualFile): Function<in FileEditor, out JComponent?>? {
         if (file.getUserData(ClipboardMail.DISMISSED) == true) return null
+        // Log mit Mails (Laravel, Django, Rails): Liste wie bei mbox. Eine einzelne Mail am Dateianfang wie bisher.
+        val logMails = MailLog.mailsInDocument(file)
+        if (logMails.size > 1 || logMails.singleOrNull()?.let { it.start > 0 } == true) return Function { editor ->
+            if (editor !is TextEditor) return@Function null
+            EditorNotificationPanel(editor, EditorNotificationPanel.Status.Info).apply {
+                icon(MailIcons.FILE)
+                text = MailViewBundle.message("log.banner", logMails.size)
+                createActionLabel(MailViewBundle.message("log.show")) { MailLog.open(project, file) }
+                createActionLabel(MailViewBundle.message("source.dismiss")) {
+                    file.putUserData(ClipboardMail.DISMISSED, true)
+                    EditorNotifications.getInstance(project).updateNotifications(file)
+                }
+            }
+        }
         val document = ClipboardMail.mailDocument(file) ?: return null
         return Function { editor ->
             if (editor !is TextEditor) return@Function null
@@ -150,6 +164,28 @@ class ShowInMailViewAction : DumbAwareAction() {
         val project = e.project ?: return
         val document = ClipboardMail.mailDocument(e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return) ?: return
         ClipboardMail.show(project, document)
+    }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
+}
+
+/** „Mails in Mail View anzeigen“: Liste der Mails in einer Logdatei (Laravel, Django, Rails), auch für sehr große Logs. */
+class ShowMailLogAction : DumbAwareAction() {
+    override fun update(e: AnActionEvent) {
+        val file = e.getData(CommonDataKeys.VIRTUAL_FILE)
+        e.presentation.isEnabledAndVisible = e.project != null && file != null && MailLog.logLike(file) && hasMails(file)
+    }
+
+    /** Geladene Dateien werden durchsucht; nicht geladene .log-Dateien bekommen den Eintrag immer (Suche erst beim Öffnen). */
+    private fun hasMails(file: VirtualFile): Boolean {
+        val document = FileDocumentManager.getInstance().getCachedDocument(file)
+        if (document != null && file.length <= 20L * 1024 * 1024) return MailLog.scan(document.immutableCharSequence).isNotEmpty()
+        return file.extension.equals("log", ignoreCase = true) || file.parent?.name == "mails"
+    }
+
+    override fun actionPerformed(e: AnActionEvent) {
+        val project = e.project ?: return
+        MailLog.open(project, e.getData(CommonDataKeys.VIRTUAL_FILE) ?: return)
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT

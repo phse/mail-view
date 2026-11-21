@@ -1,0 +1,64 @@
+[2026-11-20 09:12:41] local.INFO: Starting queue worker
+[2026-11-20 09:13:02] local.DEBUG: From: Riverside Makers <shop@example.com>
+To: Alex Morgan <alex@example.org>
+Subject: Welcome to Riverside Makers
+Message-ID: <1a7c3e9f0d1b2@example.com>
+MIME-Version: 1.0
+Date: Fri, 20 Nov 2026 09:13:02 +0000
+X-Tags: account
+Content-Type: multipart/alternative; boundary=Rm1Xk2q
+
+--Rm1Xk2q
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Welcome, Alex! Your account is ready.
+--Rm1Xk2q
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+<div style="font-family:sans-serif;max-width:560px"><h1 style="color:#1d6b5f">Welcome, Alex!</h1><p>Your account is ready. Confirm your address to start ordering.</p><p><a href="https://example.com/confirm?token=7f3a" style="background:#1d6b5f;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">Confirm address</a></p><p style="color:#667">Riverside Makers</p></div>
+--Rm1Xk2q--
+[2026-11-20 09:13:02] local.INFO: Mail sent {"mailable":"App\\Mail\\Welcome"}
+[2026-11-20 09:21:37] local.DEBUG: From: Riverside Makers <shop@example.com>
+To: Alex Morgan <alex@example.org>
+Subject: Order #1042 received
+Message-ID: <2a7c3e9f0d1b2@example.com>
+MIME-Version: 1.0
+Date: Fri, 20 Nov 2026 09:21:37 +0000
+X-Tags: order
+Content-Type: multipart/alternative; boundary=Rm2Xk2q
+
+--Rm2Xk2q
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Thanks for your order: 2 x PLA white, 1 x PETG black.
+--Rm2Xk2q
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+<div style="font-family:sans-serif;max-width:560px"><h2>Thanks for your order</h2><table style="border-collapse:collapse"><tr><td style="padding:4px 12px 4px 0">PLA filament, white</td><td>2 &times;</td></tr><tr><td style="padding:4px 12px 4px 0">PETG filament, black</td><td>1 &times;</td></tr></table><p>Total: 74,90 €</p><p style="color:#667">Riverside Makers</p></div>
+--Rm2Xk2q--
+[2026-11-20 09:21:38] local.INFO: Order 1042 stored
+[2026-11-20 09:40:15] local.DEBUG: From: Riverside Makers <shop@example.com>
+To: Sam Lee <sam@example.net>
+Subject: Reset your password
+Message-ID: <3a7c3e9f0d1b2@example.com>
+MIME-Version: 1.0
+Date: Fri, 20 Nov 2026 09:40:15 +0000
+X-Tags: account
+Content-Type: multipart/alternative; boundary=Rm3Xk2q
+
+--Rm3Xk2q
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Someone asked to reset your password: https://example.com/reset?token=c41d
+--Rm3Xk2q
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+<div style="font-family:sans-serif;max-width:560px"><p>Hi Sam,</p><p>Someone asked to reset your password.</p><p><a href="https://example.com/reset?token=c41d">Reset password</a></p><p style="color:#667;font-size:13px">If it was not you, ignore this mail.</p><p style="color:#667">Riverside Makers</p></div>
+--Rm3Xk2q--
+[2026-11-20 09:40:16] local.INFO: Password reset requested {"user":7}

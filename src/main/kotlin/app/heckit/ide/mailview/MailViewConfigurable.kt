@@ -6,6 +6,7 @@ import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.COLUMNS_TINY
 import com.intellij.ui.dsl.builder.Cell
+import com.intellij.ui.dsl.builder.bindIntText
 import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
@@ -31,6 +32,11 @@ import javax.swing.JEditorPane
  * nur, solange diese Funktionen sichtbar sind (MailHtmlRenderer.SHOW_COMPOSE).
  */
 class MailViewConfigurable : BoundConfigurable(MailViewBundle.message("settings.title")) {
+    override fun apply() {
+        super.apply()
+        IdeInbox.getInstance().apply()
+    }
+
     override fun createPanel(): DialogPanel = panel {
         row(MailViewBundle.message("settings.appearance")) {
             comboBox(MailViewSettings.Appearance.entries, textListCellRenderer { MailViewBundle.message("settings.appearance." + it!!.name.lowercase()) })
@@ -69,6 +75,20 @@ class MailViewConfigurable : BoundConfigurable(MailViewBundle.message("settings.
                 checkBox(MailViewBundle.message("settings.revealUnknown")).bindSelected(MailViewSettings::revealUnknown)
                     .comment(MailViewBundle.message("settings.revealUnknown.comment"))
             }
+        }
+        group(MailViewBundle.message("settings.inbox")) {
+            lateinit var enabled: Cell<JCheckBox>
+            row {
+                enabled = checkBox(MailViewBundle.message("settings.inbox.enabled")).bindSelected(MailViewSettings::inboxEnabled)
+                    .comment(MailViewBundle.message("settings.inbox.comment"))
+            }
+            row(MailViewBundle.message("settings.inbox.port")) {
+                intTextField(1..65535).bindIntText(MailViewSettings::inboxPort).columns(COLUMNS_TINY)
+            }.enabledIf(enabled.selected)
+            row {
+                checkBox(MailViewBundle.message("settings.inbox.network")).bindSelected(MailViewSettings::inboxNetwork)
+                    .comment(MailViewBundle.message("settings.inbox.network.comment"))
+            }.enabledIf(enabled.selected)
         }
         if (SystemInfo.isMac) group(MailViewBundle.message("settings.appleMail")) {
             lateinit var status: Cell<JEditorPane>

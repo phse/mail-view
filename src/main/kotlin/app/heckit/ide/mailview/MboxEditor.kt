@@ -24,7 +24,13 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
+import com.intellij.util.Alarm
 import com.intellij.ui.AnimatedIcon
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.OnePixelSplitter
@@ -88,6 +94,9 @@ class MboxEditorProvider : FileEditorProvider, DumbAware {
  * bis man sie von Hand ändert - dann gelten diese für die Datei.
  */
 class MboxEditor(private val project: Project, private val file: VirtualFile) : UserDataHolderBase(), FileEditor {
+    /** Bei der Liste einer Logdatei ([MailLog]) die Datei mit dem Log, sonst die mbox selbst. */
+    private val source: VirtualFile = file.getUserData(MailLog.SOURCE) ?: file
+    private val isLog = source !== file
     private var entries: List<MboxEntry> = emptyList()
     /** Nicht lokale Dateien (z. B. in einem Archiv) liegen im Speicher, lokale werden gezielt gelesen. */
     private var bytes: ByteArray? = null
@@ -246,13 +255,45 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
         listPanel.addComponentListener(object : ComponentAdapter() {
             override fun componentResized(e: ComponentEvent) { if (!manualWidths && entries.isNotEmpty()) fitColumns() }
         })
+        load()
+        // Ein Log wächst, während die Anwendung läuft: neue Mails kommen dazu (neueste oben).
+        if (isLog) ApplicationManager.getApplication().messageBus.connect(this).subscribe(VirtualFileManager.VFS_CHANGES, object : BulkFileListener {
+            override fun after(events: List<VFileEvent>) {
+                if (events.none { it.file == source }) return
+                reloadAlarm.cancelAllRequests()
+                reloadAlarm.addRequest({ load() }, RELOAD_DELAY_MS)
+            }
+        })
+    }
+
+    private val reloadAlarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, this)
+
+    /** Datei (neu) lesen und die Liste füllen. */
+    private fun load() {
         ApplicationManager.getApplication().executeOnPooledThread {
             val result = runCatching {
-                if (file.isInLocalFileSystem) MboxIndex.scan(file.toNioPath()) { cancelled.get() }
-                else file.contentsToByteArray().let { data -> bytes = data; MboxIndex.scan(data.inputStream()) }
+                val data = if (isLog) unsavedText() ?: source.takeIf { !it.isInLocalFileSystem }?.contentsToByteArray()
+                    else source.takeIf { !it.isInLocalFileSystem }?.contentsToByteArray()
+                bytes = data
+                when {
+                    data != null -> if (isLog) MailLog.scan(data.inputStream()) else MboxIndex.scan(data.inputStream())
+                    isLog -> MailLog.scan(source.toNioPath()) { cancelled.get() }
+                    else -> MboxIndex.scan(source.toNioPath()) { cancelled.get() }
+                }
             }
-            ApplicationManager.getApplication().invokeLater({ show(result) }, { cancelled.get() || !file.isValid })
+            ApplicationManager.getApplication().invokeLater({ show(result) }, { cancelled.get() || !source.isValid })
         }
+    }
+
+    /** Noch nicht gespeicherter Text (z. B. eine Scratch-Datei mit eingefügten Mails), sonst null. */
+    private fun unsavedText(): ByteArray? = ApplicationManager.getApplication().runReadAction(com.intellij.openapi.util.Computable {
+        val manager = FileDocumentManager.getInstance()
+        manager.getCachedDocument(source)?.takeIf(manager::isDocumentUnsaved)?.text?.toByteArray(source.charset)
+    })
+
+    private fun refreshFromDisk() {
+        VfsUtil.markDirtyAndRefresh(true, false, false, source)
+        load()
     }
 
     /** Zellen mit etwas Luft links und rechts. */
@@ -332,7 +373,7 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
         props.setValue(KEY_ORDER, (0 until columns.columnCount).joinToString(",") { columns.getColumn(it).modelIndex.toString() })
     }
 
-    private val widthsKey get() = "mailview.mbox.widths." + file.url.hashCode().toUInt().toString(16)
+    private val widthsKey get() = "mailview.mbox.widths." + source.url.hashCode().toUInt().toString(16)
 
     private fun saveWidths() {
         val columns = table.columnModel
@@ -396,20 +437,23 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
 
     private fun show(result: Result<List<MboxEntry>>) {
         result.onSuccess {
+            val reload = entries.isNotEmpty()
             entries = it
+            textCache.clear()
             model.fireTableDataChanged()
             val longest = MailViewBundle.message("mbox.count.filtered", it.size, it.size)
             status.reserved = status.getFontMetrics(status.font).stringWidth(longest) + status.insets.left + status.insets.right
-            applyWidths()
+            if (!reload || !manualWidths) applyWidths()
             table.emptyText.text = MailViewBundle.message("mbox.empty")
             updateStatus()
             restoreSelection()
+            if (search.text.isNotBlank()) filter(search.text)
         }.onFailure {
             table.emptyText.text = MailViewBundle.message("preview.error", it.message ?: it.javaClass.simpleName)
         }
     }
 
-    private val selectionKey get() = "mailview.mbox.selected." + file.url.hashCode().toUInt().toString(16)
+    private val selectionKey get() = "mailview.mbox.selected." + source.url.hashCode().toUInt().toString(16)
 
     /** Beim Wiederöffnen die zuletzt angesehene Mail wieder auswählen (erkannt an ihrer Position in der Datei). */
     private fun restoreSelection() {
@@ -503,6 +547,10 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
             ExportAllAction("export.attachments", AllIcons.Actions.Download) { dir -> MailExport.exportAttachments(project, entries, ::read, dir) },
             ExportAllAction("export.eml", AllIcons.Actions.MenuSaveall) { dir -> MailExport.exportEml(project, entries, ::read, dir) },
         )
+        if (isLog) group.add(object : DumbAwareAction(MailViewBundle.message("log.refresh"), null, AllIcons.Actions.Refresh) {
+            override fun actionPerformed(e: AnActionEvent) = refreshFromDisk()
+            override fun getActionUpdateThread() = ActionUpdateThread.EDT
+        }, com.intellij.openapi.actionSystem.Constraints.FIRST)
         return ActionManager.getInstance().createActionToolbar("MailView.Mbox", group, true).also { it.targetComponent = table }.component
     }
 
@@ -510,7 +558,7 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
         DumbAwareAction(MailViewBundle.message("$key.all"), null, icon) {
         override fun actionPerformed(e: AnActionEvent) {
             if (entries.isEmpty()) return
-            export(MailExport.chooseFolder(project, file.parent, "$key.title") ?: return)
+            export(MailExport.chooseFolder(project, source.parent, "$key.title") ?: return)
         }
         override fun update(e: AnActionEvent) {
             e.presentation.isEnabled = entries.isNotEmpty()
@@ -524,11 +572,11 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
             SelectionAction("mbox.openTab") { openSelected() },
             Separator.getInstance(),
             SelectionAction("export.eml.save") { targets ->
-                if (targets.size == 1) MailExport.saveEml(project, file.parent, targets[0].subject, read(targets[0]))
-                else MailExport.chooseFolder(project, file.parent, "export.eml.title.folder")?.let { MailExport.exportEml(project, targets, ::read, it) }
+                if (targets.size == 1) MailExport.saveEml(project, source.parent, targets[0].subject, read(targets[0]))
+                else MailExport.chooseFolder(project, source.parent, "export.eml.title.folder")?.let { MailExport.exportEml(project, targets, ::read, it) }
             },
             SelectionAction("export.attachments.save") { targets ->
-                MailExport.chooseFolder(project, file.parent, "export.attachments.title")?.let { MailExport.exportAttachments(project, targets, ::read, it) }
+                MailExport.chooseFolder(project, source.parent, "export.attachments.title")?.let { MailExport.exportAttachments(project, targets, ::read, it) }
             },
         )
         PopupHandler.installPopupMenu(table, group, "MailView.MboxPopup")
@@ -555,7 +603,8 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
 
     private fun selectedEntry(): MboxEntry? = table.selectedRow.takeIf { it >= 0 }?.let { entries[table.convertRowIndexToModel(it)] }
 
-    private fun read(entry: MboxEntry): ByteArray = bytes?.let { MboxIndex.read(it, entry) } ?: MboxIndex.read(file.toNioPath(), entry)
+    private fun read(entry: MboxEntry): ByteArray = if (isLog) bytes?.let { MailLog.read(it, entry) } ?: MailLog.read(source.toNioPath(), entry)
+        else bytes?.let { MboxIndex.read(it, entry) } ?: MboxIndex.read(source.toNioPath(), entry)
 
     /**
      * Angeklickte Mail unter der Liste zeigen: lesen und parsen im Hintergrund, angezeigt wird nur das Ergebnis der
@@ -563,7 +612,8 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
      */
     private fun showPreview() {
         val entry = selectedEntry() ?: return
-        if (entry === previewEntry) return
+        // Nach dem Neuladen eines Logs sind es neue Objekte: gleich ist die Mail an derselben Stelle.
+        if (previewEntry?.let { it.start == entry.start && it.end == entry.end } == true) return
         previewEntry = entry
         PropertiesComponent.getInstance().setValue(selectionKey, entry.start.toString())
         val request = ++previewRequest
@@ -614,7 +664,7 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
     override fun getName(): String = MailViewBundle.message("editor.mbox")
     override fun setState(state: FileEditorState) = Unit
     override fun isModified(): Boolean = false
-    override fun isValid(): Boolean = file.isValid
+    override fun isValid(): Boolean = file.isValid && source.isValid
     override fun getFile(): VirtualFile = file
     override fun addPropertyChangeListener(listener: PropertyChangeListener) = Unit
     override fun removePropertyChangeListener(listener: PropertyChangeListener) = Unit
@@ -633,5 +683,6 @@ class MboxEditor(private val project: Project, private val file: VirtualFile) : 
         const val KEY_ORDER = "mailview.mbox.columns"
         const val KEY_SORT_COLUMN = "mailview.mbox.sortColumn"
         const val KEY_SORT_ORDER = "mailview.mbox.sortOrder"
+        const val RELOAD_DELAY_MS = 400
     }
 }

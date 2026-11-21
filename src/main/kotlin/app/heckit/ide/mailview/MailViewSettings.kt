@@ -109,6 +109,24 @@ object MailViewSettings {
         get() = PropertiesComponent.getInstance().getBoolean(MAIL_DROP_KEY, false)
         set(value) = PropertiesComponent.getInstance().setValue(MAIL_DROP_KEY, value, false)
 
+    /** Mailserver in der IDE ([IdeInbox]) eingeschaltet. */
+    var inboxEnabled: Boolean
+        get() = PropertiesComponent.getInstance().getBoolean(INBOX_KEY, false)
+        set(value) = PropertiesComponent.getInstance().setValue(INBOX_KEY, value, false)
+
+    /** SMTP-Port des Mailservers; 2525 wie in Laravels `.env.example`. */
+    var inboxPort: Int
+        get() = PropertiesComponent.getInstance().getInt(INBOX_PORT_KEY, IdeInbox.DEFAULT_PORT).takeIf { it in 1..65535 } ?: IdeInbox.DEFAULT_PORT
+        set(value) = PropertiesComponent.getInstance().setValue(INBOX_PORT_KEY, value, IdeInbox.DEFAULT_PORT)
+
+    /** Auch Verbindungen von Docker-Containern und anderen Rechnern annehmen, sonst nur 127.0.0.1. */
+    var inboxNetwork: Boolean
+        get() = PropertiesComponent.getInstance().getBoolean(INBOX_NETWORK_KEY, false)
+        set(value) = PropertiesComponent.getInstance().setValue(INBOX_NETWORK_KEY, value, false)
+
+    private const val INBOX_KEY = "app.heckit.ide.mailview.inbox"
+    private const val INBOX_PORT_KEY = "app.heckit.ide.mailview.inboxPort"
+    private const val INBOX_NETWORK_KEY = "app.heckit.ide.mailview.inboxNetwork"
     private const val MAIL_DROP_KEY = "app.heckit.ide.mailview.mailDrop"
     private const val REMOTE_KEY = "app.heckit.ide.mailview.remoteContent"
     private const val TRUSTED_KEY = "app.heckit.ide.mailview.trustedSenders"

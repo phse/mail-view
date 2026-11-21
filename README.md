@@ -56,6 +56,18 @@ title. Click opens a mail in Mail View (preview tab), double-click or Enter keep
   session cookie (until it expires or the IDE restarts). Passkeys work via QR code on the phone; passkeys of the Mac
   itself are not offered in the embedded browser.
 
+**Mail server in the IDE** (*Settings | Tools | Mail View*, or `+` in the Mailpit tool window): receives the mails your
+application sends via SMTP on `127.0.0.1:2525` (port configurable, no TLS, any or no login), without Docker or Mailpit.
+They show up as the tab *IDE* in the Mailpit tool window, right when they arrive, with search, tags and read state like
+the Mailpit tabs. *Copy Connection Settings…* copies the settings for Laravel, Symfony, Spring Boot, Django, Rails or
+Nodemailer. Nothing is sent on; the mails stay in the IDE's system folder (the latest 1,000).
+
+**Mails in logs and consoles**: Laravel's default mailer `log` writes mails into `storage/logs/laravel.log`, Django's
+`filebased` backend and Rails' `:file` delivery into files, Django's `console` backend into the run console. Log files
+with mails show a bar *This log contains N mails*; *Show Mails* (also in the context menu, for logs of any size) lists
+them like an mbox, and new mails appear while the log grows. In the run and debug console the subject of a printed mail
+is a link that opens it in Mail View.
+
 Mails attached to a `.msg` are converted to `.eml` and open in Mail View again.
 
 **winmail.dat** (Outlook TNEF): other mail clients only show this one file. Mail View lists the files inside
@@ -178,8 +190,9 @@ marketplace/mailpit-demo/start.sh
 ```
 
 Copies `marketplace/demo-project` to `/Users/Shared/mail-demo` (so no user path shows up in the
-images), opens it in the sandbox and writes nine PNGs to `marketplace/screenshots/` (mail, attachments,
-content tab, dark theme, headers tab, mbox list, text tab, Mailpit, phone width). For the Mailpit image, start the demo container first
+images), opens it in the sandbox and writes PNGs to `marketplace/screenshots/` (mail, attachments,
+content tab, dark theme, headers tab, mbox list, text tab, Mailpit, phone width, mails of a Laravel log, mail server in
+the IDE, run console with a mail and the mail opened from it). For the Mailpit image, start the demo container first
 with `marketplace/mailpit-demo/start.sh` (Docker, web UI on port 18030, neutral demo mails); without it that image is
 skipped. The IDE paints its own window for this, no screen recording permission is
 needed. The helper lives in `src/screenshot/` and is only compiled with `-Pscreenshots`, never into a
@@ -209,6 +222,9 @@ If the sandbox asks on the first run, confirm "Trust Project" once and run the c
 | `MailLint.kt` | Format warnings for the *Headers* tab |
 | `MailTextStructure.kt` | *Text* tab: header names, folding of MIME parts and encoded header values |
 | `MailCompare.kt` | *Compare Mails*: normalized text of a mail, diff viewer |
+| `MailLog.kt` | Mails in logs (Laravel, Django, Rails): detection, list tab for a log file |
+| `MailConsoleFilter.kt` | Subject of a mail printed in the run console as a link |
+| `IdeInbox.kt` | Mail server in the IDE: SMTP server (receive only), storage, tab in the Mailpit tool window |
 | `Mailpit.kt` | Mailpit REST client (list, tags, relay), instances (global/project, detected ones), credentials |
 | `MailpitDiscovery.kt` | Mailpit in the Compose file (minimal YAML reading, `.env` variables) and in running containers (`docker ps`) |
 | `MailpitReleaseDialog.kt` | Recipients for *Release via SMTP…*, checked against the relay's allowed/blocked recipients |

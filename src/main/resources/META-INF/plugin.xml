@@ -23,6 +23,8 @@
 
 <p><b>Mailpit</b>: the Mailpit tool window lists the mails your application sent to a local <a href="https://mailpit.axllent.org/">Mailpit</a> test server and opens them in Mail View with one click. Mailpit in DDEV, in the project's Docker Compose file (e.g. Laravel Sail) or in a running Docker container (e.g. Testcontainers) is found automatically. Tags are shown and can be filtered; mails can be released to real addresses via Mailpit's SMTP relay.</p>
 
+<p><b>Mail server in the IDE</b>: receive the mails your application sends via SMTP (127.0.0.1:2525) right in the IDE - no Docker, no Mailpit. Settings for Laravel, Symfony, Spring Boot, Django, Rails and Nodemailer are one click away.</p>
+<p><b>Mails in logs and consoles</b>: Laravel's <code>log</code> mailer, Django's <code>console</code> and <code>filebased</code> backends and Rails' <code>:file</code> delivery write mails as plain text - Mail View lists the mails of a log file and turns the subject of a mail in the run console into a link that opens it rendered.</p>
 <p><b>Phone and tablet width</b>: check how a responsive mail looks on a phone (375 px) or tablet (768 px) with one click.</p>
 
 <p><b>macOS:</b> drag mails from Apple Mail onto a folder in the project tree to save them as .eml (after a one-time permission in the settings).</p>
@@ -59,6 +61,8 @@
                   extensions="mbox;mbx"/>
         <fileEditorProvider id="mail-view-mbox" order="first"
                             implementation="app.heckit.ide.mailview.MboxEditorProvider"/>
+        <fileEditorProvider id="mail-view-log" order="first"
+                            implementation="app.heckit.ide.mailview.MailLogEditorProvider"/>
         <fileEditorProvider id="mail-view-preview" order="first"
                             implementation="app.heckit.ide.mailview.MailPreviewEditorProvider"/>
         <fileEditorProvider id="mail-view-content" order="after mail-view-preview"
@@ -74,6 +78,9 @@
         <editorFactoryListener implementation="app.heckit.ide.mailview.MailTextContextMenu"/>
         <postStartupActivity implementation="app.heckit.ide.mailview.ScreenshotStarter"/>
         <postStartupActivity implementation="app.heckit.ide.mailview.MailDropInstaller$Startup"/>
+        <postStartupActivity implementation="app.heckit.ide.mailview.IdeInboxStartup"/>
+        <!-- Mails in der Run-/Debug-Konsole (Django console-Backend, Rails-Log): Betreff als Link. -->
+        <consoleFilterProvider implementation="app.heckit.ide.mailview.MailConsoleFilterProvider"/>
         <editorNotificationProvider implementation="app.heckit.ide.mailview.MailEditModeNotificationProvider"/>
         <editorNotificationProvider implementation="app.heckit.ide.mailview.MailSourceNotificationProvider"/>
         <toolWindow id="Mailpit" anchor="right" secondary="false" icon="app.heckit.ide.mailview.MailpitIcons.TOOL_WINDOW"
@@ -93,6 +100,11 @@
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>
             <add-to-group group-id="EditorTabPopupMenu" anchor="first"/>
             <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>
+        </action>
+        <action id="MailView.ShowMailLog" class="app.heckit.ide.mailview.ShowMailLogAction" icon="/icons/eml.svg">
+            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="MailView.ShowInMailView"/>
+            <add-to-group group-id="EditorTabPopupMenu" anchor="after" relative-to-action="MailView.ShowInMailView"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="after" relative-to-action="MailView.ShowInMailView"/>
         </action>
     </actions>
 </idea-plugin>

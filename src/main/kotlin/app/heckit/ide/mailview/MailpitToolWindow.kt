@@ -70,11 +70,37 @@ class MailpitTabs(private val project: Project, private val toolWindow: ToolWind
         // den Reitern Platz weg, und Reiter springen hinter den Pfeil.
         com.intellij.ui.ClientProperty.put(toolWindow.component,
             com.intellij.openapi.wm.impl.content.ToolWindowContentUi.DONT_HIDE_TOOLBAR_IN_HEADER, true)
-        toolWindow.setTitleActions(listOf(object : DumbAwareAction(MailViewBundle.message("mailpit.add"), null, AllIcons.General.Add) {
-            override fun actionPerformed(e: AnActionEvent) = edit(null)
-            override fun getActionUpdateThread() = ActionUpdateThread.EDT
-        }))
+        // „+“: Mailpit hinzufügen oder den Mailserver in der IDE einschalten.
+        val add = DefaultActionGroup(MailViewBundle.message("mailpit.add.menu"), true).apply {
+            templatePresentation.icon = AllIcons.General.Add
+            add(object : DumbAwareAction(MailViewBundle.message("mailpit.add")) {
+                override fun actionPerformed(e: AnActionEvent) = edit(null)
+                override fun getActionUpdateThread() = ActionUpdateThread.EDT
+            })
+            add(object : com.intellij.openapi.project.DumbAwareToggleAction(MailViewBundle.message("inbox.add")) {
+                override fun isSelected(e: AnActionEvent) = MailViewSettings.inboxEnabled
+                override fun setSelected(e: AnActionEvent, state: Boolean) = setInbox(state)
+                override fun getActionUpdateThread() = ActionUpdateThread.EDT
+            })
+        }
+        toolWindow.setTitleActions(listOf(add))
+        // Neue Mail oder Mailserver an/aus (auch aus den Einstellungen oder einem anderen Projekt): Reiter angleichen.
+        IdeInbox.getInstance().addListener(toolWindow.disposable) {
+            ApplicationManager.getApplication().invokeLater({ rebuild() }, { project.isDisposed })
+        }
         discover(0)
+    }
+
+    /** Mailserver in der IDE ein- bzw. ausschalten; eingeschaltet wird sein Reiter gewählt. */
+    fun setInbox(enabled: Boolean) {
+        if (!enabled) {
+            val ok = Messages.showYesNoDialog(project, MailViewBundle.message("inbox.stop.question"), MailViewBundle.message("inbox.stop"),
+                Messages.getQuestionIcon()) == Messages.YES
+            if (!ok) return
+        }
+        MailViewSettings.inboxEnabled = enabled
+        IdeInbox.getInstance().apply()
+        rebuild(if (enabled) IdeInbox.INSTANCE_ID else null)
     }
 
     /**
@@ -146,6 +172,10 @@ class MailpitTabs(private val project: Project, private val toolWindow: ToolWind
 
     /** Neue Instanz ([instance] null) bzw. Instanz ändern; Zugangsdaten aus dem Passwort-Speicher im Hintergrund. */
     fun edit(instance: MailpitInstance?) {
+        if (instance != null && MailpitInstances.isInbox(instance)) {
+            com.intellij.openapi.options.ShowSettingsUtil.getInstance().showSettingsDialog(project, MailViewConfigurable::class.java)
+            return
+        }
         ApplicationManager.getApplication().executeOnPooledThread {
             val credentials = instance?.let { MailpitSettings.credentials(it.url) }
             ApplicationManager.getApplication().invokeLater({ edit(instance, credentials) }, { project.isDisposed })
@@ -170,6 +200,7 @@ class MailpitTabs(private val project: Project, private val toolWindow: ToolWind
     }
 
     fun remove(instance: MailpitInstance) {
+        if (MailpitInstances.isInbox(instance)) return setInbox(false)
         val ok = Messages.showYesNoDialog(project, MailViewBundle.message("mailpit.remove.question", instance.name, instance.url),
             MailViewBundle.message("mailpit.remove"), Messages.getQuestionIcon()) == Messages.YES
         if (!ok) return
@@ -212,7 +243,9 @@ class MailpitPanel(
     /** Schon geöffnete Mails: ein zweiter Klick holt den vorhandenen Tab nach vorn. */
     private val opened = mutableMapOf<String, VirtualFile>()
     private var signature: List<Triple<String, Boolean, List<String>>>? = null
-    @Volatile private var client = MailpitClient(instance.url)
+    /** Mailserver in der IDE statt einer Mailpit-Instanz. */
+    private val inbox = MailpitInstances.isInbox(instance)
+    @Volatile private var client: MailBox = if (inbox) IdeInbox.getInstance() else MailpitClient(instance.url)
     /** Client neu aufbauen (Zugangsdaten aus dem Passwort-Speicher, daher im Hintergrund). */
     @Volatile private var reload = true
     private var lastError: String? = null
@@ -252,7 +285,8 @@ class MailpitPanel(
             action("mailpit.deleteAll", AllIcons.Actions.GC) { deleteAll() },
             TagFilterAction(),
             Separator.getInstance(),
-            action("mailpit.openWeb", AllIcons.General.Web) { BrowserUtil.browse(client.baseUrl) },
+            if (inbox) action("inbox.connection", AllIcons.Actions.Copy) { connectionSettings() }
+            else action("mailpit.openWeb", AllIcons.General.Web) { BrowserUtil.browse(client.baseUrl) },
         ), true)
         toolbar.targetComponent = list
         // Rechts: Einstellungen dieser Instanz (bearbeiten, entfernen), getrennt von den Aktionen auf die Mails.
@@ -301,7 +335,11 @@ class MailpitPanel(
         PopupHandler.installPopupMenu(list, DefaultActionGroup(
             action("mailpit.open", null) { openSelected(preview = false) },
             action("mailpit.save", AllIcons.Actions.MenuSaveall) { saveSelected() },
-            action("mailpit.openWebMail", AllIcons.General.Web) { selected().forEach { BrowserUtil.browse(client.webUrl(it.id)) } },
+            object : DumbAwareAction(MailViewBundle.message("mailpit.openWebMail"), null, AllIcons.General.Web) {
+                override fun update(e: AnActionEvent) { e.presentation.isVisible = !inbox }
+                override fun actionPerformed(e: AnActionEvent) = selected().forEach { m -> client.webUrl(m.id)?.let(BrowserUtil::browse) }
+                override fun getActionUpdateThread() = ActionUpdateThread.EDT
+            },
             object : DumbAwareAction(MailViewBundle.message("mailpit.release"), null, AllIcons.Actions.Forward) {
                 override fun update(e: AnActionEvent) {
                     e.presentation.isVisible = relay != null
@@ -328,6 +366,10 @@ class MailpitPanel(
             },
             action("mailpit.delete", AllIcons.Actions.Cancel) { deleteSelected() },
         ), "MailView.MailpitPopup")
+        // Neue Mail im Mailserver der IDE: gleich zeigen, nicht erst beim nächsten Nachsehen.
+        if (inbox) IdeInbox.getInstance().addListener(this) {
+            ApplicationManager.getApplication().invokeLater({ refresh(force = true) }, { disposed })
+        }
         refresh(force = true)
     }
 
@@ -344,7 +386,7 @@ class MailpitPanel(
         alarm.cancelAllRequests()
         if (force) signature = null
         alarm.addRequest({
-            if (reload) { reload = false; client = MailpitSettings.client(instance.url) }
+            if (reload) { reload = false; client = if (inbox) IdeInbox.getInstance() else MailpitSettings.client(instance.url) }
             val current = client
             val due = force || (toolWindow.isVisible && content?.isSelected == true) ||
                 System.currentTimeMillis() - lastPoll >= BACKGROUND_POLL_MS
@@ -391,9 +433,14 @@ class MailpitPanel(
                 list.selectedIndices = messages.indices.filter { messages[it].id in keep }.toIntArray()
             }
             val filtered = effectiveQuery().isNotBlank()
-            list.emptyText.text = MailViewBundle.message(if (filtered) "mailpit.search.none" else "mailpit.empty")
+            if (inbox && !filtered) {
+                list.emptyText.clear()
+                list.emptyText.appendLine(MailViewBundle.message("inbox.empty"))
+                list.emptyText.appendLine(MailViewBundle.message("inbox.empty.address", IdeInbox.getInstance().address))
+                list.emptyText.appendLine(MailViewBundle.message("inbox.connection"), SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES) { connectionSettings() }
+            } else list.emptyText.text = MailViewBundle.message(if (filtered) "mailpit.search.none" else "mailpit.empty")
             val unread = messages.count { !it.read }
-            status.text = MailViewBundle.message("mailpit.status", messages.size, unread, MailpitInstances.hostOf(client.baseUrl))
+            status.text = MailViewBundle.message("mailpit.status", messages.size, unread, client.label)
             // Während einer Suche zählt die Liste nur Treffer: Reiter und Titel behalten dann die letzte Gesamtzahl.
             if (!filtered) {
                 content?.displayName = if (unread > 0) "${instance.name} ($unread)" else instance.name
@@ -403,10 +450,18 @@ class MailpitPanel(
             signature = null
             model.removeAll()
             list.emptyText.clear()
-            list.emptyText.appendLine(MailViewBundle.message("mailpit.unreachable", client.baseUrl))
-            if (error is MailpitAuthException)
-                list.emptyText.appendLine(MailViewBundle.message("mailpit.login"), SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES) { login() }
-            list.emptyText.appendLine(MailViewBundle.message("mailpit.edit"), SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES) { tabs.edit(instance) }
+            if (inbox) {
+                list.emptyText.appendLine(error.message ?: error.javaClass.simpleName)
+                list.emptyText.appendLine(MailViewBundle.message("inbox.settings"), SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES) { tabs.edit(instance) }
+            } else {
+                list.emptyText.appendLine(MailViewBundle.message("mailpit.unreachable", client.baseUrl))
+                if (error is MailpitAuthException)
+                    list.emptyText.appendLine(MailViewBundle.message("mailpit.login"), SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES) { login() }
+                list.emptyText.appendLine(MailViewBundle.message("mailpit.edit"), SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES) { tabs.edit(instance) }
+                // Nur der Platzhalter (kein Mailpit eingerichtet oder gefunden): Mailserver in der IDE anbieten.
+                if (instance.auto && instance.id == "auto" && instance.url == MailpitSettings.DEFAULT_URL)
+                    list.emptyText.appendLine(MailViewBundle.message("inbox.offer"), SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES) { tabs.setInbox(true) }
+            }
             status.text = error.message ?: error.javaClass.simpleName
             lastError = status.text
             relayChecked = 0L
@@ -488,6 +543,35 @@ class MailpitPanel(
                     .onFailure { Messages.showErrorDialog(project, it.message, MailViewBundle.message("mailpit.release.title")) }
             }, { project.isDisposed })
         }
+    }
+
+    /**
+     * Einstellungen für die eigene Anwendung, damit sie an den Mailserver der IDE schickt: Auswahl nach Framework,
+     * kopiert in die Zwischenablage.
+     */
+    private fun connectionSettings() {
+        val port = MailViewSettings.inboxPort
+        val snippets = linkedMapOf(
+            "Laravel (.env)" to "MAIL_MAILER=smtp\nMAIL_SCHEME=null\nMAIL_HOST=127.0.0.1\nMAIL_PORT=$port\nMAIL_USERNAME=null\nMAIL_PASSWORD=null",
+            "Symfony (.env)" to "MAILER_DSN=smtp://127.0.0.1:$port",
+            "Spring Boot (application.properties)" to "spring.mail.host=127.0.0.1\nspring.mail.port=$port",
+            "Django (settings.py)" to "EMAIL_BACKEND = \"django.core.mail.backends.smtp.EmailBackend\"\nEMAIL_HOST = \"127.0.0.1\"\nEMAIL_PORT = $port",
+            "Rails (config/environments/development.rb)" to
+                "config.action_mailer.delivery_method = :smtp\nconfig.action_mailer.smtp_settings = { address: \"127.0.0.1\", port: $port }",
+            "Node.js (Nodemailer)" to "nodemailer.createTransport({ host: \"127.0.0.1\", port: $port, secure: false })",
+            MailViewBundle.message("inbox.connection.plain") to "127.0.0.1:$port",
+        )
+        val keys = snippets.keys.toList()
+        val step = object : com.intellij.openapi.ui.popup.util.BaseListPopupStep<String>(MailViewBundle.message("inbox.connection.title"), keys) {
+            override fun onChosen(selectedValue: String, finalChoice: Boolean): com.intellij.openapi.ui.popup.PopupStep<*>? {
+                com.intellij.openapi.ide.CopyPasteManager.getInstance().setContents(java.awt.datatransfer.StringSelection(snippets[selectedValue] + "\n"))
+                toast.show(MailViewBundle.message("inbox.connection.copied", selectedValue), loading = false, hold = true)
+                return FINAL_CHOICE
+            }
+        }
+        val popup = com.intellij.openapi.ui.popup.JBPopupFactory.getInstance().createListPopup(step)
+        popup.setAdText(MailViewBundle.message("inbox.connection.hint"), javax.swing.SwingConstants.LEFT)
+        popup.showInCenterOf(list)
     }
 
     /** Suchfeld und Schlagwort als eine Mailpit-Suche (`tag:name`, mit Leerzeichen in Anführungszeichen). */

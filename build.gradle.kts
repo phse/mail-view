@@ -74,6 +74,18 @@ intellijPlatform {
             untilBuild = provider { null }
         }
         changeNotes = """
+            <h3>1.3.0</h3>
+            <ul>
+              <li><b>Mail server in the IDE</b>: receives the mails your application sends via SMTP on 127.0.0.1:2525
+                  (no TLS, any login, nothing is sent on) and shows them as the tab <i>IDE</i> in the Mailpit tool window -
+                  without Docker or Mailpit. Turn it on with <i>+</i> in the tool window or in <i>Settings | Tools | Mail View</i>;
+                  <i>Copy Connection Settings…</i> has the settings for Laravel, Symfony, Spring Boot, Django, Rails and Nodemailer.</li>
+              <li><b>Mails in logs</b>: Laravel logs (<code>MAIL_MAILER=log</code>, the default), Django's <code>filebased</code>
+                  backend and Rails' <code>:file</code> delivery: <i>Show Mails</i> lists the mails of the log like an mbox, new
+                  mails appear while the log grows.</li>
+              <li><b>Mails in the run console</b>: the subject of a mail printed by Django's <code>console</code> backend or the
+                  Rails log is a link that opens the mail in Mail View.</li>
+            </ul>
             <h3>1.2.0</h3>
             <ul>
               <li><b>Phone and tablet width</b>: a new button at the top right of the mail shows it 375 px (phone) or

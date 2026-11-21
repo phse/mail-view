@@ -9,6 +9,10 @@
 
 The associations can be changed under *Settings | Editor | File Types*. Text files that contain a mail source show a *Show in Mail View* bar.
 
+**Mails in logs**: log files with mails in them (Laravel `MAIL_MAILER=log`, Django `filebased` backend, Rails `:file` delivery in `tmp/mails/`, Rails `development.log`) show a bar *This log contains N mails* with *Show Mails*; the project view and editor menus have *Show Mails in Mail View* (also for logs over 20 MB). The list works like the one of an mbox and picks up new mails while the log grows. A mail starts with a header block that has at least three of the usual fields, one of them `MIME-Version` or `Message-ID`; it ends at its closing MIME boundary, at Django's line of 79 dashes, at the next Laravel log line or where the next mail starts.
+
+**Run and debug consoles**: when an application prints a mail (Django `console` backend, Rails log), its subject becomes a link that opens the mail in Mail View.
+
 ## Settings
 
 **Settings | Tools | Mail View** (also in the right-click menus of the mail). IDE-wide, not per project.
@@ -48,9 +52,19 @@ Archives and executables are always only revealed. Running them is possible from
 
 When allowed, mails dragged from Apple Mail onto a folder in the project view are saved there as `.eml`. Mail View reads them from Mail via JavaScript for Automation, because Apple Mail only hands out a file promise that Java can't take. Mail View never asks for the permission on its own. Once it is denied, it can only be changed in System Settings (*Privacy & Security | Automation | <IDE> | Mail*); the button then opens them.
 
+**Mail Server in the IDE**
+
+| Option | Values | Default |
+| --- | --- | --- |
+| Receive mails via SMTP | on / off (also `+` in the Mailpit tool window) | off |
+| Port | 1–65535 | 2525 |
+| Accept connections from Docker containers and other computers | on: all network interfaces, containers use `host.docker.internal` / off: only 127.0.0.1 | off |
+
+The server accepts every mail and sends nothing on: no TLS (not offered, so clients stay unencrypted), any or no login (AUTH PLAIN and LOGIN), up to 50 MB per mail. Mails are stored as `.eml` in the IDE's system folder (`mail-view/inbox`, the latest 1,000) and show up in the Mailpit tool window as the tab *IDE*. Each mail gets `Return-Path` and `Received` like from a delivering server; recipients that are only in the SMTP envelope are added as `Bcc`. *Copy Connection Settings…* in the tab copies the settings for Laravel, Symfony, Spring Boot, Django, Rails or Nodemailer. If the port is taken, the tab says so and links to the settings.
+
 ## Mailpit
 
-Tool window **Mailpit** (right side): one tab per [Mailpit](https://mailpit.axllent.org/) instance. `+` in the header adds one, the gear edits it, `−` removes it (the mails stay in Mailpit).
+Tool window **Mailpit** (right side): one tab per [Mailpit](https://mailpit.axllent.org/) instance, plus *IDE* for the mail server in the IDE. `+` in the header adds a Mailpit instance or turns on the mail server, the gear edits a tab, `−` removes it (the mails stay in Mailpit).
 
 | Field | Values | Default |
 | --- | --- | --- |
@@ -76,3 +90,4 @@ Tool window **Mailpit** (right side): one tab per [Mailpit](https://mailpit.axll
 - The mail file is never written. Only the *Text* tab can change an `.eml`, after *Edit* (until the IDE restarts).
 - mbox: only the headers are streamed, mails are extracted as `.eml` into a temp folder, and the mbox itself stays unchanged. Column order, widths and sorting are remembered IDE-wide, the last viewed mail per file.
 - Exports never overwrite existing files (`name (2).pdf`).
+- Laravel decodes quoted-printable before logging but keeps the header; Mail View treats such parts as 8bit, so `=` in the HTML stays intact.

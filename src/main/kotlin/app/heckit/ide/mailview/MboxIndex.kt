@@ -12,8 +12,12 @@ import java.io.RandomAccessFile
 import java.nio.file.Path
 import java.util.Date
 
-/** Eine Mail in der mbox: Lage in der Datei (ohne die „From “-Trennzeile) und die Angaben für die Liste. */
-class MboxEntry(val start: Long, val end: Long, val subject: String?, val from: String?, val date: Date?, val attachments: Int = 0, val to: String? = null) {
+/**
+ * Eine Mail in der mbox: Lage in der Datei (ohne die „From “-Trennzeile) und die Angaben für die Liste. [decodedQp]:
+ * aus einem Laravel-Log, dort ist quoted-printable schon dekodiert (der Header sagt es aber noch).
+ */
+class MboxEntry(val start: Long, val end: Long, val subject: String?, val from: String?, val date: Date?, val attachments: Int = 0,
+                val to: String? = null, val decodedQp: Boolean = false) {
     val size: Long get() = end - start
 }
 
@@ -111,13 +115,13 @@ object MboxIndex {
     private val ATTACHMENT = Regex("""(?i)^content-disposition:\s*attachment""")
 
     /** Anhänge zählen ohne die Mail zu parsen: Teile mit „Content-Disposition: attachment“ im Inhalt. */
-    private fun isAttachmentLine(bytes: ByteArray): Boolean {
+    internal fun isAttachmentLine(bytes: ByteArray): Boolean {
         if (bytes.size < DISPOSITION.size || (bytes[0] != 'C'.code.toByte() && bytes[0] != 'c'.code.toByte())) return false
         if (!DISPOSITION.indices.all { Character.toLowerCase(bytes[it].toInt()) == DISPOSITION[it].toInt() }) return false
         return ATTACHMENT.containsMatchIn(String(bytes, Charsets.US_ASCII))
     }
 
-    private fun entry(start: Long, end: Long, header: ByteArray, attachments: Int): MboxEntry {
+    internal fun entry(start: Long, end: Long, header: ByteArray, attachments: Int, decodedQp: Boolean = false): MboxEntry {
         val headers = runCatching { InternetHeaders(ByteArrayInputStream(header)) }.getOrNull()
         fun value(name: String) = headers?.getHeader(name, null)?.let { runCatching { MimeUtility.decodeText(MimeUtility.unfold(it)) }.getOrDefault(it) }
         val from = headers?.getHeader("From", null)?.let { raw ->
@@ -130,7 +134,7 @@ object MboxIndex {
                 .getOrNull() ?: value("To")
         }
         val date = headers?.getHeader("Date", null)?.let { runCatching { MailDateFormat().parse(MimeUtility.unfold(it).trim()) }.getOrNull() }
-        return MboxEntry(start, end, value("Subject")?.trim(), from?.trim(), date, attachments, to?.trim())
+        return MboxEntry(start, end, value("Subject")?.trim(), from?.trim(), date, attachments, to?.trim(), decodedQp)
     }
 
     private val FROM = "From ".toByteArray()

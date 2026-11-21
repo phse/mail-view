@@ -51,9 +51,32 @@ class MailpitAuthException(val status: Int, val withCredentials: Boolean) : java
         }.getOrDefault("HTTP $status")
 }
 
+/**
+ * Ein Postfach im Mailpit-Tool-Window: eine Mailpit-Instanz ([MailpitClient]) oder der Mailserver in der IDE ([IdeInbox]).
+ * Alle Aufrufe blockieren, also nicht im EDT.
+ */
+interface MailBox {
+    /** Adresse für Meldungen und die Weboberfläche. */
+    val baseUrl: String
+    /** Kurz für die Statuszeile (Host bzw. SMTP-Adresse). */
+    val label: String
+    fun list(limit: Int = MailpitClient.LIMIT, query: String? = null): List<MailpitMessage>
+    fun raw(id: String): ByteArray
+    fun markRead(ids: List<String>, read: Boolean = true)
+    fun delete(ids: List<String>)
+    fun deleteAll()
+    fun tags(): List<String>
+    /** Weiterleiten über SMTP, null: nicht möglich. */
+    fun relay(): MailpitRelay? = null
+    fun release(id: String, to: List<String>): Unit = throw UnsupportedOperationException()
+    /** Weboberfläche zu einer Mail, null: keine. */
+    fun webUrl(id: String): String? = null
+}
+
 /** Mailpit-Instanz unter [baseUrl] (z. B. `http://localhost:8025`), über deren REST-API. */
-class MailpitClient(baseUrl: String, user: String? = null, password: String? = null, private val cookie: String? = null) {
-    val baseUrl = baseUrl.trim().trimEnd('/')
+class MailpitClient(baseUrl: String, user: String? = null, password: String? = null, private val cookie: String? = null) : MailBox {
+    override val baseUrl = baseUrl.trim().trimEnd('/')
+    override val label: String get() = MailpitInstances.hostOf(baseUrl)
     private val api = "${this.baseUrl}/api/v1"
     /** Basic Auth (Mailpit `--ui-auth` oder ein Proxy davor), nur wenn ein Benutzer gesetzt ist. */
     private val authorization = user?.takeIf { it.isNotEmpty() }?.let {
@@ -61,7 +84,7 @@ class MailpitClient(baseUrl: String, user: String? = null, password: String? = n
     }
 
     /** Neueste Mails; mit [query] die Volltextsuche von Mailpit (Betreff, Adressen, Text, auch `from:`, `subject:` …). */
-    fun list(limit: Int = LIMIT, query: String? = null): List<MailpitMessage> {
+    override fun list(limit: Int, query: String?): List<MailpitMessage> {
         val url = if (query.isNullOrBlank()) "$api/messages?limit=$limit"
             else "$api/search?limit=$limit&query=" + java.net.URLEncoder.encode(query.trim(), Charsets.UTF_8)
         val json = JsonParser.parseString(send(get(url)).toString(Charsets.UTF_8)).asJsonObject
@@ -69,22 +92,27 @@ class MailpitClient(baseUrl: String, user: String? = null, password: String? = n
     }
 
     /** Unveränderter Quelltext der Mail (.eml). */
-    fun raw(id: String): ByteArray = send(get("$api/message/${encode(id)}/raw"))
+    override fun raw(id: String): ByteArray = send(get("$api/message/${encode(id)}/raw"))
 
-    fun markRead(ids: List<String>, read: Boolean = true) =
+    override fun markRead(ids: List<String>, read: Boolean) {
         send(request("$api/messages", "PUT", """{"IDs":${ids.toJson()},"Read":$read}"""))
+    }
 
-    fun delete(ids: List<String>) = send(request("$api/messages", "DELETE", """{"IDs":${ids.toJson()}}"""))
+    override fun delete(ids: List<String>) {
+        send(request("$api/messages", "DELETE", """{"IDs":${ids.toJson()}}"""))
+    }
 
-    fun deleteAll() = send(request("$api/messages", "DELETE", "{}"))
+    override fun deleteAll() {
+        send(request("$api/messages", "DELETE", "{}"))
+    }
 
     /** Alle Schlagwörter dieser Instanz. */
-    fun tags(): List<String> = JsonParser.parseString(send(get("$api/tags")).toString(Charsets.UTF_8)).let { json ->
+    override fun tags(): List<String> = JsonParser.parseString(send(get("$api/tags")).toString(Charsets.UTF_8)).let { json ->
         if (json.isJsonArray) json.asJsonArray.mapNotNull { it.takeIf { e -> e.isJsonPrimitive }?.asString } else emptyList()
     }
 
     /** Weiterleiten über SMTP, falls in Mailpit eingerichtet; sonst null (auch bei älteren Mailpit-Versionen ohne diese Angabe). */
-    fun relay(): MailpitRelay? {
+    override fun relay(): MailpitRelay? {
         val json = JsonParser.parseString(send(get("$api/webui")).toString(Charsets.UTF_8)).asJsonObject
         val relay = json.get("MessageRelay")?.takeIf { it.isJsonObject }?.asJsonObject ?: return null
         if (relay.get("Enabled")?.takeIf { it.isJsonPrimitive }?.asBoolean != true) return null
@@ -94,11 +122,12 @@ class MailpitClient(baseUrl: String, user: String? = null, password: String? = n
     }
 
     /** Mail über den SMTP-Server aus [relay] an [to] schicken. */
-    fun release(id: String, to: List<String>) =
+    override fun release(id: String, to: List<String>) {
         send(request("$api/message/${encode(id)}/release", "POST", """{"To":${to.toJson()}}"""))
+    }
 
     /** Weboberfläche zu einer Mail. */
-    fun webUrl(id: String) = "$baseUrl/view/${encode(id)}"
+    override fun webUrl(id: String) = "$baseUrl/view/${encode(id)}"
 
     private fun builder(url: String) = HttpRequest.newBuilder(URI(url)).timeout(TIMEOUT)
         .apply { authorization?.let { header("Authorization", it) } }
@@ -194,9 +223,11 @@ object MailpitInstances {
         val auto = detected(project, containers)
         val seen = stored.map { normalize(it.url) }.toMutableSet()
         val fresh = auto.filter { seen.add(normalize(it.url)) }
-        val fallback = if (stored.isEmpty() && fresh.isEmpty())
+        // Mailserver in der IDE (eingeschaltet in den Einstellungen) als erster Reiter.
+        val inbox = if (MailViewSettings.inboxEnabled) listOf(inboxInstance()) else emptyList()
+        val fallback = if (stored.isEmpty() && fresh.isEmpty() && inbox.isEmpty())
             listOf(MailpitInstance("auto", "localhost", MailpitSettings.DEFAULT_URL, auto = true)) else emptyList()
-        return fallback + fresh + stored
+        return inbox + fallback + fresh + stored
     }
 
     /**
@@ -232,6 +263,10 @@ object MailpitInstances {
         }
         return result
     }
+
+    fun inboxInstance() = MailpitInstance(IdeInbox.INSTANCE_ID, MailViewBundle.message("inbox.tab"), IdeInbox.getInstance().baseUrl, global = true)
+
+    fun isInbox(instance: MailpitInstance) = instance.id == IdeInbox.INSTANCE_ID
 
     /** Gleiche Instanz trotz anderer Schreibweise (127.0.0.1/localhost, Schrägstrich am Ende). */
     private fun normalize(url: String): String = url.trim().trimEnd('/').lowercase()
